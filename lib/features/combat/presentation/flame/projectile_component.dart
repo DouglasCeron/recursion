@@ -5,6 +5,7 @@ import 'package:flame/components.dart';
 
 import '../../../ship/domain/weapon_definition.dart';
 import 'boss_component.dart';
+import 'observer_component.dart';
 import 'space_game.dart';
 
 /// A player projectile. It only moves and reports collisions; damage is
@@ -72,11 +73,15 @@ class ProjectileComponent extends PositionComponent
     PositionComponent other,
   ) {
     super.onCollisionStart(intersectionPoints, other);
-    if (_resolved || other is! BossPartComponent) return;
-    final consumed = game.session.reportHit(
-      projectileId: projectileId,
-      componentId: other.componentId,
-    );
+    if (_resolved) return;
+    final consumed = switch (other) {
+      BossPartComponent() => game.session.reportHit(
+        projectileId: projectileId,
+        componentId: other.componentId,
+      ),
+      ObserverComponent() => game.session.reportObserverHit(projectileId),
+      _ => false,
+    };
     if (!consumed) return;
     _resolved = true;
     removeFromParent();

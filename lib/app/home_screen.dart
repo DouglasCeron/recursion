@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/boss_evolution/application/boss_intel_controller.dart';
+import '../features/boss_evolution/domain/boss_intel.dart';
 import '../features/inventory/application/inventory_controller.dart';
 import 'router.dart';
 
@@ -40,10 +42,28 @@ class HomeScreen extends ConsumerWidget {
                 'Equipped: ${weapon.name}',
                 style: textTheme.bodySmall?.copyWith(color: Colors.white54),
               ),
+              const SizedBox(height: 4),
+              Text(
+                _intelSummary(ref.watch(bossIntelControllerProvider)),
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFFB39DDB),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  static String _intelSummary(BossIntel intel) {
+    final latest = intel.latest;
+    if (latest == null) return 'Enemy intel: none';
+    final weapons = latest.profile.weapons.values
+        .map((w) => '${w.type.name} (${w.level.name})')
+        .join(', ');
+    return 'Enemy intel: ${intel.reports.length} report(s)'
+        '${weapons.isEmpty ? '' : '\nLatest: $weapons'}';
   }
 }

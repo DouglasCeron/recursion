@@ -39,6 +39,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
               outcome: hud.outcome!,
               collectedItems: hud.collectedItems,
               lostItems: hud.lostItems,
+              intelTransmitted: hud.intelTransmitted,
               onRestart: () => ref.invalidate(battleSessionProvider),
               onExit: () => Navigator.of(context).pop(),
             ),
@@ -78,6 +79,13 @@ class _BattleHud extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             for (final part in hud.bossParts) _PartBar(part: part),
+            _PartBar(
+              part: BossPartHud(
+                name: 'Observer',
+                integrity: hud.observerIntegrity,
+                maxIntegrity: hud.observerMaxIntegrity,
+              ),
+            ),
             const SizedBox(height: 8),
             if (escapeTimeLeft != null)
               _Banner(
@@ -182,6 +190,7 @@ class _BattleResult extends StatelessWidget {
     required this.outcome,
     required this.collectedItems,
     required this.lostItems,
+    required this.intelTransmitted,
     required this.onRestart,
     required this.onExit,
   });
@@ -189,6 +198,7 @@ class _BattleResult extends StatelessWidget {
   final BattleOutcome outcome;
   final List<String> collectedItems;
   final List<String> lostItems;
+  final bool intelTransmitted;
   final VoidCallback onRestart;
   final VoidCallback onExit;
 
@@ -220,6 +230,18 @@ class _BattleResult extends StatelessWidget {
                     style: const TextStyle(color: Colors.white54),
                   ),
                 ],
+                const SizedBox(height: 8),
+                Text(
+                  intelTransmitted
+                      ? 'The observer sent intel on your weapons to the enemy.'
+                      : 'The observer was destroyed. No intel was sent.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: intelTransmitted
+                        ? const Color(0xFFB39DDB)
+                        : Colors.white54,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 FilledButton(onPressed: onRestart, child: const Text('Retry')),
                 TextButton(onPressed: onExit, child: const Text('Main menu')),

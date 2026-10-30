@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../boss_evolution/application/boss_intel_controller.dart';
 import '../../inventory/application/inventory_controller.dart';
 import '../../ship/domain/weapon_catalog.dart';
 import '../application/battle_session.dart';
@@ -9,13 +10,21 @@ import '../domain/entities/dropped_item.dart';
 import '../domain/events/battle_event.dart';
 
 /// A battle using the currently equipped weapon. Collected drops are added
-/// to the inventory as soon as the battle confirms the pickup.
+/// to the inventory as soon as the battle confirms the pickup, and observer
+/// transmissions reach the enemy intel when the battle ends.
 final battleSessionProvider = Provider.autoDispose<BattleSession>((ref) {
   final weapon = ref.read(inventoryControllerProvider).equippedWeapon;
   final session = BattleSession.boss(weapon: weapon);
   final subscription = session.events.listen((event) {
-    if (event is ItemCollected) {
-      ref.read(inventoryControllerProvider.notifier).collect(event.itemId);
+    switch (event) {
+      case ItemCollected():
+        ref.read(inventoryControllerProvider.notifier).collect(event.itemId);
+      case ObserverTransmitted():
+        ref
+            .read(bossIntelControllerProvider.notifier)
+            .receiveTransmission(event.stats);
+      default:
+        break;
     }
   });
   ref.onDispose(() {
@@ -57,6 +66,9 @@ class BattleHudState {
     required this.availableDrop,
     required this.collectedItems,
     required this.lostItems,
+    required this.observerIntegrity,
+    required this.observerMaxIntegrity,
+    required this.intelTransmitted,
   });
 
   factory BattleHudState.fromBattle(BattleState battle) {
@@ -93,6 +105,9 @@ class BattleHudState {
         for (final drop in battle.drops)
           if (drop.status == DropStatus.expired) _itemName(drop.itemId),
       ],
+      observerIntegrity: battle.observer.integrity,
+      observerMaxIntegrity: battle.observer.maxIntegrity,
+      intelTransmitted: battle.intelTransmitted,
     );
   }
 
@@ -113,8 +128,12 @@ class BattleHudState {
   final ({String name, double timeLeft})? availableDrop;
   final List<String> collectedItems;
   final List<String> lostItems;
+  final int observerIntegrity;
+  final int observerMaxIntegrity;
+  final bool intelTransmitted;
 
   double get hullRatio => hull / maxHull;
+  bool get observerDestroyed => observerIntegrity == 0;
 
   static String _itemName(String itemId) =>
       WeaponCatalog.byId(itemId)?.name ?? itemId;

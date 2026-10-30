@@ -11,6 +11,7 @@ import 'arena_component.dart';
 import 'boss_component.dart';
 import 'drop_component.dart';
 import 'enemy_projectile_component.dart';
+import 'observer_component.dart';
 import 'player_ship_component.dart';
 import 'projectile_component.dart';
 
@@ -31,6 +32,7 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
   final BattleSession session;
   late final PlayerShipComponent _ship;
   late final BossComponent _boss;
+  late final ObserverComponent _observer;
   final Map<int, DropComponent> _drops = {};
   StreamSubscription<BattleEvent>? _subscription;
 
@@ -50,7 +52,12 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
     );
     _ship = PlayerShipComponent(ship: session.state.ship);
     _boss = BossComponent(boss: session.state.boss);
-    world.addAll([_ship, _boss]);
+    _observer = ObserverComponent(
+      observer: session.state.observer,
+      position: Vector2(36, arena.height * 0.45),
+      hoverRange: arena.height * 0.12,
+    );
+    world.addAll([_ship, _boss, _observer]);
 
     _subscription = session.events.listen(_onBattleEvent);
   }
@@ -106,6 +113,8 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
         _boss.flyAway();
       case ShipDestroyed():
         _ship.explode();
+      case ObserverDestroyed():
+        _observer.explode();
       case BattleCompleted():
         _clearProjectiles();
       case BattleStarted() ||
@@ -114,6 +123,8 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
           WeakPointExposed() ||
           WeakPointClosed() ||
           BossEscapeWarning() ||
+          ObserverHit() ||
+          ObserverTransmitted() ||
           ShipHit():
         break;
     }

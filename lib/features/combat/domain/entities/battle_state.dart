@@ -1,8 +1,13 @@
 import '../../../ship/domain/ship_state.dart';
 import '../../../ship/domain/weapon_definition.dart';
 import '../events/battle_event.dart';
+import '../rules/damage_rules.dart';
+import 'battle_record.dart';
+import 'boss_component_state.dart';
 import 'boss_state.dart';
+import 'combat_log.dart';
 import 'dropped_item.dart';
+import 'observer_drone.dart';
 
 enum BattleStatus { notStarted, inProgress, completed }
 
@@ -15,15 +20,21 @@ class BattleState {
   BattleState({
     required this.ship,
     required this.boss,
+    ObserverDrone? observer,
     this.dropLifetime = defaultDropLifetime,
-  });
+  }) : observer = observer ?? ObserverDrone();
 
   /// Seconds a drop stays on the battlefield before it is lost.
   static const defaultDropLifetime = 8.0;
 
   final ShipState ship;
   final BossState boss;
+  final ObserverDrone observer;
   final double dropLifetime;
+
+  /// Everything that really happened, regardless of what the observer saw.
+  final CombatLog _log = CombatLog();
+  bool _intelTransmitted = false;
   final Map<int, DroppedItem> _drops = {};
   final List<String> _collectedItemIds = [];
   int _nextDropId = 0;
@@ -51,6 +62,22 @@ class BattleState {
 
   /// Items the player actually picked up during this battle.
   List<String> get collectedItemIds => List.unmodifiable(_collectedItemIds);
+
+  bool get intelTransmitted => _intelTransmitted;
+
+  BattleRecord get record => BattleRecord(
+    bossId: boss.definition.id,
+    outcome: _outcome,
+    duration: _elapsed,
+    stats: _log.snapshot(),
+    destroyedComponentIds: [
+      for (final c in boss.components)
+        if (c.isDestroyed) c.id,
+    ],
+    collectedItemIds: collectedItemIds,
+    observerDestroyed: observer.isDestroyed,
+    intelTransmitted: _intelTransmitted,
+  );
 
   bool isProjectileInFlight(int projectileId) =>
       _playerProjectiles.containsKey(projectileId) ||
@@ -101,6 +128,8 @@ class BattleState {
       final projectileId = _nextProjectileId++;
       _playerProjectiles[projectileId] = weapon;
       _shotsFired++;
+      _log.recordShot(weapon.type);
+      observer.observeShot(weapon.type);
       events.add(
         WeaponFired(
           projectileId: projectileId,
@@ -133,6 +162,13 @@ class BattleState {
 
     _playerProjectiles.remove(projectileId);
     _hitsLanded++;
+    final hit = events.whereType<BossComponentHit>().single;
+    _recordHit(
+      weapon.type,
+      damage: hit.damage,
+      onCore: boss.component(componentId)!.kind == BossComponentKind.core,
+      coreExposed: hit.weakPointBonus,
+    );
     for (final destroyed
         in events.whereType<BossComponentDestroyed>().toList()) {
       final itemId = boss.definition
@@ -144,6 +180,29 @@ class BattleState {
       _complete(BattleOutcome.victory, events);
     }
     return events;
+  }
+
+  /// Resolves a player projectile hitting the observer drone. The projectile
+  /// stays in flight if the drone is already destroyed.
+  List<BattleEvent> resolveObserverHit({required int projectileId}) {
+    if (_status != BattleStatus.inProgress || observer.isDestroyed) {
+      return const [];
+    }
+    final weapon = _playerProjectiles.remove(projectileId);
+    if (weapon == null) return const [];
+
+    _hitsLanded++;
+    final damage = DamageRules.damageFor(baseDamage: weapon.damage);
+    _recordHit(weapon.type, damage: damage);
+    final outcome = observer.receiveDamage(damage);
+    return [
+      ObserverHit(
+        projectileId: projectileId,
+        damage: outcome.damageApplied,
+        remainingIntegrity: outcome.remainingIntegrity,
+      ),
+      if (outcome.destroyedNow) const ObserverDestroyed(),
+    ];
   }
 
   /// Resolves a reported collision between an enemy projectile and the ship.
@@ -199,7 +258,28 @@ class BattleState {
     );
   }
 
-  /// Ends the battle. Drops that were not collected are lost.
+  void _recordHit(
+    WeaponType type, {
+    required int damage,
+    bool onCore = false,
+    bool coreExposed = false,
+  }) {
+    _log.recordHit(
+      type,
+      damage: damage,
+      onCore: onCore,
+      coreExposed: coreExposed,
+    );
+    observer.observeHit(
+      type,
+      damage: damage,
+      onCore: onCore,
+      coreExposed: coreExposed,
+    );
+  }
+
+  /// Ends the battle. Drops that were not collected are lost, and a surviving
+  /// observer transmits what it recorded.
   void _complete(BattleOutcome outcome, List<BattleEvent> events) {
     _status = BattleStatus.completed;
     _outcome = outcome;
@@ -209,6 +289,11 @@ class BattleState {
       if (drop.expire()) {
         events.add(ItemExpired(dropId: drop.id, itemId: drop.itemId));
       }
+    }
+    final transmitted = observer.transmit();
+    if (transmitted != null) {
+      _intelTransmitted = true;
+      events.add(ObserverTransmitted(stats: transmitted));
     }
     events.add(BattleCompleted(outcome: outcome));
   }

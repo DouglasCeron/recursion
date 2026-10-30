@@ -1,6 +1,7 @@
 import '../../../ship/domain/weapon_definition.dart';
 import '../entities/boss_component_state.dart';
 import '../entities/boss_state.dart';
+import '../entities/combat_log.dart';
 
 enum BattleOutcome { victory, defeat, bossEscaped }
 
@@ -130,6 +131,29 @@ class ItemExpired extends BattleEvent {
 
   final int dropId;
   final String itemId;
+}
+
+class ObserverHit extends BattleEvent {
+  const ObserverHit({
+    required this.projectileId,
+    required this.damage,
+    required this.remainingIntegrity,
+  });
+
+  final int projectileId;
+  final int damage;
+  final int remainingIntegrity;
+}
+
+class ObserverDestroyed extends BattleEvent {
+  const ObserverDestroyed();
+}
+
+/// The observer survived and sent what it recorded to the enemy faction.
+class ObserverTransmitted extends BattleEvent {
+  const ObserverTransmitted({required this.stats});
+
+  final CombatStats stats;
 }
 
 class ShipHit extends BattleEvent {

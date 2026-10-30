@@ -290,6 +290,110 @@ void main() {
     });
   });
 
+  group('observer', () {
+    test('takes damage from player projectiles, once per projectile', () {
+      final battle = newBattle();
+      final projectileId = fireOnce(battle);
+
+      final events = battle.resolveObserverHit(projectileId: projectileId);
+      final duplicate = battle.resolveObserverHit(projectileId: projectileId);
+
+      expect(events.whereType<ObserverHit>().single.damage, blaster.damage);
+      expect(battle.observer.integrity, 60 - blaster.damage);
+      expect(duplicate, isEmpty);
+    });
+
+    test('is destroyed once and then lets projectiles pass', () {
+      final battle = newBattle(weapon: breaker);
+
+      final events = battle.resolveObserverHit(projectileId: fireOnce(battle));
+      final next = fireOnce(battle);
+
+      expect(events.whereType<ObserverDestroyed>(), hasLength(1));
+      expect(battle.resolveObserverHit(projectileId: next), isEmpty);
+      expect(battle.isProjectileInFlight(next), isTrue);
+    });
+
+    test('a surviving observer transmits what it saw when the battle ends', () {
+      final battle = newBattle(weapon: breaker);
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
+
+      final events = battle.resolveHit(
+        projectileId: fireOnce(battle),
+        componentId: coreId,
+      );
+
+      final transmitted = events.whereType<ObserverTransmitted>().single;
+      final usage = transmitted.stats.weapons[WeaponType.heavyCannon]!;
+      expect(usage.shots, 2);
+      expect(usage.hits, 2);
+      expect(usage.damage, 500);
+      expect(transmitted.stats.weapons.keys, [WeaponType.heavyCannon]);
+      expect(battle.intelTransmitted, isTrue);
+      expect(events.last, isA<BattleCompleted>());
+    });
+
+    test('a destroyed observer transmits nothing', () {
+      final battle = newBattle(weapon: breaker);
+      battle.resolveObserverHit(projectileId: fireOnce(battle));
+
+      final events = battle.resolveHit(
+        projectileId: fireOnce(battle),
+        componentId: coreId,
+      );
+
+      expect(events.whereType<ObserverTransmitted>(), isEmpty);
+      expect(battle.intelTransmitted, isFalse);
+    });
+
+    test('transmits on defeat and escape too', () {
+      final battle = newBattle();
+      final events = <BattleEvent>[];
+      while (battle.status == BattleStatus.inProgress) {
+        events.addAll(
+          battle.resolveShipHit(projectileId: nextEnemyShot(battle)),
+        );
+      }
+
+      expect(battle.outcome, BattleOutcome.defeat);
+      expect(events.whereType<ObserverTransmitted>(), hasLength(1));
+    });
+  });
+
+  group('battle record', () {
+    test('reflects real usage even when the observer is destroyed', () {
+      final battle = newBattle(weapon: breaker);
+      battle.resolveObserverHit(projectileId: fireOnce(battle));
+      fireOnce(battle);
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: coreId);
+
+      final record = battle.record;
+
+      expect(record.outcome, BattleOutcome.victory);
+      expect(record.observerDestroyed, isTrue);
+      expect(record.intelTransmitted, isFalse);
+      final usage = record.stats.weapons[WeaponType.heavyCannon]!;
+      expect(usage.shots, battle.shotsFired);
+      expect(usage.hits, 2);
+      expect(record.destroyedComponentIds, [coreId]);
+      expect(record.bossId, BossCatalog.sentinel.id);
+    });
+
+    test('tracks core damage dealt while exposed', () {
+      final battle = newBattle();
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: coreId);
+      while (!battle.boss.isCoreVulnerable) {
+        battle.update(0.05);
+      }
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: coreId);
+
+      final stats = battle.record.stats;
+
+      expect(stats.coreDamage, 30);
+      expect(stats.coreDamageWhileExposed, 20);
+    });
+  });
+
   test('the boss escaping ends the battle after the warning', () {
     const piercer = WeaponDefinition(
       id: 'test.piercer',

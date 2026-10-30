@@ -57,6 +57,13 @@ class BattleSession {
 
   void reportDropTouched(int dropId) => _publish(state.collectDrop(dropId));
 
+  /// Reports a player projectile touching the observer drone. Returns whether
+  /// the projectile was consumed.
+  bool reportObserverHit(int projectileId) {
+    _publish(state.resolveObserverHit(projectileId: projectileId));
+    return !state.isProjectileInFlight(projectileId);
+  }
+
   void reportProjectileLeftArena(int projectileId) =>
       state.discardProjectile(projectileId);
 

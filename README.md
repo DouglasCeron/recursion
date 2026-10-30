@@ -14,7 +14,7 @@ The proof of concept is built in stages:
 | 1 | Arena, ship movement, auto-fire, simple target, collisions | Done |
 | 2 | Modular boss (cannon, armor, core), vulnerability window, flagged escape | Done |
 | 3 | Component drops, in-battle collection, inventory and loadout | Done |
-| 4 | Observer drone, weapon exposure profile, intel transmission | Pending |
+| 4 | Observer drone, weapon exposure profile, intel transmission | Done |
 | 5 | Second, adaptive boss driven by transmitted intel | Pending |
 | 6 | Local persistence (versioned JSON), validation and docs | Pending |
 
@@ -108,12 +108,44 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 - Inventory and loadout currently live in memory only; they reset when the
   app restarts until persistence lands in stage 6.
 
+## Observer drone and enemy intel
+
+Three separate concepts:
+
+1. **`BattleRecord`** — internal summary of what really happened (outcome,
+   duration, per-weapon shots/hits/damage, core damage, destroyed parts,
+   collected items). Always complete.
+2. **Observer transmission** — what the enemy drone recorded while alive:
+   per-weapon-type shots, hits and damage, plus core damage dealt while the
+   core was exposed. Nothing else (no inventory, no positions).
+3. **`BossIntel`** — the reports the enemy faction actually received. It only
+   grows; reports from earlier battles are never erased.
+
+Rules:
+
+- The drone hovers along the left edge with **60 integrity**. It does not
+  attack and can be destroyed by any player weapon.
+- It transmits **when the battle ends, if it is still alive**, whatever the
+  outcome (victory, defeat or escape). Destroying it means the enemy gets no
+  new intel from that battle.
+- Each transmission becomes a `WeaponExposureProfile`. Each weapon type that
+  was fired gets a level from its share of the total damage dealt:
+  **low < 15% ≤ medium ≤ 50% < high**. Weapons that were never fired are not
+  in the profile, so owning a weapon never exposes it.
+- **Weak point focus** is the share of core damage dealt while the core was
+  exposed; at **50% or more** the profile flags the player as exploiting the
+  weak point.
+- Metrics are aggregated in memory during the battle; nothing is written per
+  shot. Intel currently lives in memory and resets on restart until stage 6.
+
 ## Tests
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
-  escape rule, boss behavior, drops, ship movement/firing/hull, battle state,
-  inventory and loadout).
+  escape rule, boss behavior, drops, observer, battle record, exposure
+  profile, intel, ship movement/firing/hull, battle state, inventory and
+  loadout).
 - `test/integration/` — full boss battles (victory and escape) played through
-  `BattleSession`, and drop collection wired to the inventory through
-  Riverpod, all without rendering.
+  `BattleSession`, drop collection wired to the inventory, and observer
+  transmissions reaching (or not reaching) the enemy intel through Riverpod,
+  all without rendering.
 - `test/widget/` — app smoke test.
