@@ -37,6 +37,8 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
           if (hud.status == BattleStatus.completed && hud.outcome != null)
             _BattleResult(
               outcome: hud.outcome!,
+              collectedItems: hud.collectedItems,
+              lostItems: hud.lostItems,
               onRestart: () => ref.invalidate(battleSessionProvider),
               onExit: () => Navigator.of(context).pop(),
             ),
@@ -55,6 +57,7 @@ class _BattleHud extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final escapeTimeLeft = hud.escapeTimeLeft;
+    final drop = hud.availableDrop;
     return IgnorePointer(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -83,6 +86,15 @@ class _BattleHud extends StatelessWidget {
               )
             else if (hud.coreVulnerable)
               const _Banner(text: 'CORE EXPOSED  ×2', color: Color(0xFFFF4D6D)),
+            if (drop != null) ...[
+              const SizedBox(height: 6),
+              _Banner(
+                text:
+                    'GRAB ${drop.name.toUpperCase()}  '
+                    '${drop.timeLeft.toStringAsFixed(1)}s',
+                color: const Color(0xFFFFC857),
+              ),
+            ],
             const Spacer(),
             Text('Hull', style: textTheme.labelSmall),
             const SizedBox(height: 4),
@@ -168,11 +180,15 @@ class _Banner extends StatelessWidget {
 class _BattleResult extends StatelessWidget {
   const _BattleResult({
     required this.outcome,
+    required this.collectedItems,
+    required this.lostItems,
     required this.onRestart,
     required this.onExit,
   });
 
   final BattleOutcome outcome;
+  final List<String> collectedItems;
+  final List<String> lostItems;
   final VoidCallback onRestart;
   final VoidCallback onExit;
 
@@ -193,6 +209,17 @@ class _BattleResult extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                if (collectedItems.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('Collected: ${collectedItems.join(', ')}'),
+                ],
+                if (lostItems.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Lost: ${lostItems.join(', ')}',
+                    style: const TextStyle(color: Colors.white54),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton(onPressed: onRestart, child: const Text('Retry')),
                 TextButton(onPressed: onExit, child: const Text('Main menu')),

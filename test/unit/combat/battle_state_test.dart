@@ -204,6 +204,92 @@ void main() {
     });
   });
 
+  group('drops', () {
+    ItemDropped destroyCannon(BattleState battle) => battle
+        .resolveHit(projectileId: fireOnce(battle), componentId: cannonId)
+        .whereType<ItemDropped>()
+        .single;
+
+    test('destroying the cannon drops the heavy cannon where it was', () {
+      final battle = newBattle(weapon: breaker);
+      final projectileId = fireOnce(battle);
+      final (x, y) = battle.boss.componentPosition(cannonId);
+
+      final dropped = battle
+          .resolveHit(projectileId: projectileId, componentId: cannonId)
+          .whereType<ItemDropped>()
+          .single;
+
+      expect(dropped.itemId, WeaponCatalog.heavyCannon.id);
+      expect(dropped.x, x);
+      expect(dropped.y, y);
+      expect(dropped.lifetime, BattleState.defaultDropLifetime);
+    });
+
+    test('parts without a drop leave nothing behind', () {
+      final battle = newBattle(weapon: breaker);
+
+      final events = battle.resolveHit(
+        projectileId: fireOnce(battle),
+        componentId: armorId,
+      );
+
+      expect(events.whereType<ItemDropped>(), isEmpty);
+      expect(battle.drops, isEmpty);
+    });
+
+    test('destroying a part does not grant its item', () {
+      final battle = newBattle(weapon: breaker);
+      destroyCannon(battle);
+
+      expect(battle.collectedItemIds, isEmpty);
+    });
+
+    test('collecting grants the item exactly once', () {
+      final battle = newBattle(weapon: breaker);
+      final dropId = destroyCannon(battle).dropId;
+
+      final first = battle.collectDrop(dropId);
+      final second = battle.collectDrop(dropId);
+
+      expect(
+        first.whereType<ItemCollected>().single.itemId,
+        WeaponCatalog.heavyCannon.id,
+      );
+      expect(second, isEmpty);
+      expect(battle.collectedItemIds, [WeaponCatalog.heavyCannon.id]);
+    });
+
+    test('an uncollected drop expires after its lifetime', () {
+      final battle = newBattle(weapon: breaker);
+      final dropId = destroyCannon(battle).dropId;
+
+      final events = <BattleEvent>[];
+      for (var i = 0; i < 170; i++) {
+        events.addAll(battle.update(0.05));
+      }
+
+      expect(events.whereType<ItemExpired>().single.dropId, dropId);
+      expect(battle.collectDrop(dropId), isEmpty);
+      expect(battle.collectedItemIds, isEmpty);
+    });
+
+    test('ending the battle loses uncollected drops', () {
+      final battle = newBattle(weapon: breaker);
+      final dropId = destroyCannon(battle).dropId;
+
+      final events = battle.resolveHit(
+        projectileId: fireOnce(battle),
+        componentId: coreId,
+      );
+
+      expect(events.whereType<ItemExpired>().single.dropId, dropId);
+      expect(events.last, isA<BattleCompleted>());
+      expect(battle.collectDrop(dropId), isEmpty);
+      expect(battle.collectedItemIds, isEmpty);
+    });
+  });
+
   test('the boss escaping ends the battle after the warning', () {
     const piercer = WeaponDefinition(
       id: 'test.piercer',

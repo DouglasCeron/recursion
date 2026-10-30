@@ -9,6 +9,7 @@ import '../../application/battle_session.dart';
 import '../../domain/events/battle_event.dart';
 import 'arena_component.dart';
 import 'boss_component.dart';
+import 'drop_component.dart';
 import 'enemy_projectile_component.dart';
 import 'player_ship_component.dart';
 import 'projectile_component.dart';
@@ -30,6 +31,7 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
   final BattleSession session;
   late final PlayerShipComponent _ship;
   late final BossComponent _boss;
+  final Map<int, DropComponent> _drops = {};
   StreamSubscription<BattleEvent>? _subscription;
 
   @override
@@ -77,8 +79,17 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
             projectileId: event.projectileId,
             origin: Vector2(event.originX, event.originY),
             speed: event.projectileSpeed,
+            weaponType: event.weaponType,
           ),
         );
+      case ItemDropped():
+        final drop = session.state.drop(event.dropId);
+        if (drop == null) return;
+        final component = DropComponent(drop: drop);
+        _drops[event.dropId] = component;
+        world.add(component);
+      case ItemCollected(:final dropId) || ItemExpired(:final dropId):
+        _drops.remove(dropId)?.removeFromParent();
       case EnemyFired():
         world.add(
           EnemyProjectileComponent(

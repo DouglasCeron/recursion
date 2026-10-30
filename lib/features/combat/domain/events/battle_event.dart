@@ -101,6 +101,37 @@ class BossDefeated extends BattleEvent {
   const BossDefeated();
 }
 
+class ItemDropped extends BattleEvent {
+  const ItemDropped({
+    required this.dropId,
+    required this.itemId,
+    required this.x,
+    required this.y,
+    required this.lifetime,
+  });
+
+  final int dropId;
+  final String itemId;
+  final double x;
+  final double y;
+  final double lifetime;
+}
+
+/// The player picked up a drop; only now does the item become theirs.
+class ItemCollected extends BattleEvent {
+  const ItemCollected({required this.dropId, required this.itemId});
+
+  final int dropId;
+  final String itemId;
+}
+
+class ItemExpired extends BattleEvent {
+  const ItemExpired({required this.dropId, required this.itemId});
+
+  final int dropId;
+  final String itemId;
+}
+
 class ShipHit extends BattleEvent {
   const ShipHit({required this.damage, required this.remainingHull});
 

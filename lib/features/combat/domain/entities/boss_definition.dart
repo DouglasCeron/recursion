@@ -14,6 +14,7 @@ class BossComponentDefinition {
     required this.offsetY,
     required this.width,
     required this.height,
+    this.dropItemId,
   });
 
   final String id;
@@ -24,6 +25,9 @@ class BossComponentDefinition {
   final double offsetY;
   final double width;
   final double height;
+
+  /// Item left on the battlefield when this part is destroyed, if any.
+  final String? dropItemId;
 }
 
 /// Single shots aimed at the ship, fired while the cannon is operational.

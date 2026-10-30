@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 
+import '../../../ship/domain/weapon_definition.dart';
 import 'boss_component.dart';
 import 'space_game.dart';
 
@@ -14,13 +15,32 @@ class ProjectileComponent extends PositionComponent
     required this.projectileId,
     required Vector2 origin,
     required this.speed,
-  }) : super(position: origin, size: Vector2(4, 12), anchor: Anchor.center);
+    required WeaponType weaponType,
+  }) : _paint = Paint()..color = _colorFor(weaponType),
+       super(
+         position: origin,
+         size: _sizeFor(weaponType),
+         anchor: Anchor.center,
+       );
 
   final int projectileId;
   final double speed;
+  final Paint _paint;
   bool _resolved = false;
 
-  final _paint = Paint()..color = const Color(0xFFFFF59D);
+  static Vector2 _sizeFor(WeaponType type) => switch (type) {
+    WeaponType.heavyCannon => Vector2(9, 16),
+    WeaponType.blaster ||
+    WeaponType.missile ||
+    WeaponType.laser => Vector2(4, 12),
+  };
+
+  static Color _colorFor(WeaponType type) => switch (type) {
+    WeaponType.heavyCannon => const Color(0xFFFFB74D),
+    WeaponType.blaster ||
+    WeaponType.missile ||
+    WeaponType.laser => const Color(0xFFFFF59D),
+  };
 
   @override
   Future<void> onLoad() async {

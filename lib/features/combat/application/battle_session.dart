@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../../core/geometry/arena_bounds.dart';
 import '../../ship/domain/ship_state.dart';
 import '../../ship/domain/weapon_catalog.dart';
+import '../../ship/domain/weapon_definition.dart';
 import '../domain/content/boss_catalog.dart';
 import '../domain/entities/battle_state.dart';
 import '../domain/entities/boss_definition.dart';
@@ -16,11 +17,12 @@ class BattleSession {
 
   factory BattleSession.boss({
     BossDefinition boss = BossCatalog.sentinel,
+    WeaponDefinition weapon = WeaponCatalog.blaster,
     ArenaBounds arena = ArenaBounds.standard,
   }) {
     return BattleSession(
       BattleState(
-        ship: ShipState(arena: arena, weapon: WeaponCatalog.blaster),
+        ship: ShipState(arena: arena, weapon: weapon),
         boss: BossState(definition: boss, arena: arena),
       ),
     );
@@ -52,6 +54,8 @@ class BattleSession {
 
   void reportShipHit(int projectileId) =>
       _publish(state.resolveShipHit(projectileId: projectileId));
+
+  void reportDropTouched(int dropId) => _publish(state.collectDrop(dropId));
 
   void reportProjectileLeftArena(int projectileId) =>
       state.discardProjectile(projectileId);

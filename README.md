@@ -13,7 +13,7 @@ The proof of concept is built in stages:
 |---|---|---|
 | 1 | Arena, ship movement, auto-fire, simple target, collisions | Done |
 | 2 | Modular boss (cannon, armor, core), vulnerability window, flagged escape | Done |
-| 3 | Component drops, in-battle collection, inventory and loadout | Pending |
+| 3 | Component drops, in-battle collection, inventory and loadout | Done |
 | 4 | Observer drone, weapon exposure profile, intel transmission | Pending |
 | 5 | Second, adaptive boss driven by transmitted intel | Pending |
 | 6 | Local persistence (versioned JSON), validation and docs | Pending |
@@ -93,10 +93,27 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
 Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 `bossEscaped`.
 
+## Drops, inventory and loadout
+
+- Destroying the Sentinel's cannon drops the **Heavy Cannon** (35 damage,
+  0.6 s between shots) where the cannon was. The armor and core drop nothing.
+- A drop drifts down the arena and must be **touched by the ship** to be
+  collected. Destroying the part never grants the item by itself.
+- A drop is lost if it is not collected within **8 s**, or when the battle
+  ends for any reason (victory, defeat or escape). A drop can be collected at
+  most once.
+- Collected items are added to the inventory immediately. The weapon to use
+  is chosen in the Inventory screen before a battle; it cannot be swapped
+  mid-battle.
+- Inventory and loadout currently live in memory only; they reset when the
+  app restarts until persistence lands in stage 6.
+
 ## Tests
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
-  escape rule, boss behavior, ship movement/firing/hull, battle state).
+  escape rule, boss behavior, drops, ship movement/firing/hull, battle state,
+  inventory and loadout).
 - `test/integration/` — full boss battles (victory and escape) played through
-  `BattleSession` without rendering.
+  `BattleSession`, and drop collection wired to the inventory through
+  Riverpod, all without rendering.
 - `test/widget/` — app smoke test.

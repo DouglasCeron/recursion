@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/inventory/application/inventory_controller.dart';
 import 'router.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final weapon = ref.watch(inventoryControllerProvider).equippedWeapon;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -25,6 +28,17 @@ class HomeScreen extends StatelessWidget {
                 onPressed: () =>
                     Navigator.of(context).pushNamed(AppRoutes.battle),
                 child: const Text('Start battle'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.inventory),
+                child: const Text('Inventory'),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Equipped: ${weapon.name}',
+                style: textTheme.bodySmall?.copyWith(color: Colors.white54),
               ),
             ],
           ),

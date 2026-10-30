@@ -76,6 +76,12 @@ class BossState {
   bool get isCoreVulnerable =>
       isActive && definition.coreWindow.isOpenAt(_time);
 
+  /// Current arena position of a part's center.
+  (double, double) componentPosition(String id) {
+    final part = definition.component(id);
+    return (_x + part.offsetX, y + part.offsetY);
+  }
+
   int get totalIntegrity =>
       _components.values.fold(0, (sum, c) => sum + c.integrity);
   int get totalMaxIntegrity =>

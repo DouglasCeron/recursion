@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../features/combat/presentation/battle_screen.dart';
+import '../features/inventory/presentation/inventory_screen.dart';
 import 'home_screen.dart';
 
 abstract final class AppRoutes {
   static const home = '/';
   static const battle = '/battle';
+  static const inventory = '/inventory';
 }
 
 abstract final class AppRouter {
   static Route<void> onGenerateRoute(RouteSettings settings) {
     final Widget page = switch (settings.name) {
       AppRoutes.battle => const BattleScreen(),
+      AppRoutes.inventory => const InventoryScreen(),
       _ => const HomeScreen(),
     };
     return MaterialPageRoute(settings: settings, builder: (_) => page);

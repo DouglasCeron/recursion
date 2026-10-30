@@ -41,6 +41,7 @@ abstract final class BossCatalog {
         offsetY: 48,
         width: 20,
         height: 28,
+        dropItemId: 'weapon.heavy_cannon',
       ),
     ],
     coreWindow: VulnerabilityWindow(period: 8, openDuration: 3),

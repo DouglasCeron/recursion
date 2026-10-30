@@ -1,13 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../inventory/application/inventory_controller.dart';
+import '../../ship/domain/weapon_catalog.dart';
 import '../application/battle_session.dart';
 import '../domain/entities/battle_state.dart';
 import '../domain/entities/boss_state.dart';
+import '../domain/entities/dropped_item.dart';
 import '../domain/events/battle_event.dart';
 
+/// A battle using the currently equipped weapon. Collected drops are added
+/// to the inventory as soon as the battle confirms the pickup.
 final battleSessionProvider = Provider.autoDispose<BattleSession>((ref) {
-  final session = BattleSession.boss();
-  ref.onDispose(session.dispose);
+  final weapon = ref.read(inventoryControllerProvider).equippedWeapon;
+  final session = BattleSession.boss(weapon: weapon);
+  final subscription = session.events.listen((event) {
+    if (event is ItemCollected) {
+      ref.read(inventoryControllerProvider.notifier).collect(event.itemId);
+    }
+  });
+  ref.onDispose(() {
+    subscription.cancel();
+    session.dispose();
+  });
   return session;
 });
 
@@ -40,10 +54,14 @@ class BattleHudState {
     required this.bossPattern,
     required this.coreVulnerable,
     required this.escapeTimeLeft,
+    required this.availableDrop,
+    required this.collectedItems,
+    required this.lostItems,
   });
 
   factory BattleHudState.fromBattle(BattleState battle) {
     final boss = battle.boss;
+    final available = battle.drops.where((d) => d.isAvailable);
     return BattleHudState(
       status: battle.status,
       outcome: battle.outcome,
@@ -64,6 +82,17 @@ class BattleHudState {
       escapeTimeLeft: boss.phase == BossPhase.escaping
           ? boss.escapeTimeLeft
           : null,
+      availableDrop: available.isEmpty
+          ? null
+          : (
+              name: _itemName(available.first.itemId),
+              timeLeft: available.first.timeLeft,
+            ),
+      collectedItems: battle.collectedItemIds.map(_itemName).toList(),
+      lostItems: [
+        for (final drop in battle.drops)
+          if (drop.status == DropStatus.expired) _itemName(drop.itemId),
+      ],
     );
   }
 
@@ -80,7 +109,15 @@ class BattleHudState {
   /// Seconds until the boss escapes, or null when no escape is announced.
   final double? escapeTimeLeft;
 
+  /// A drop waiting to be picked up, if any.
+  final ({String name, double timeLeft})? availableDrop;
+  final List<String> collectedItems;
+  final List<String> lostItems;
+
   double get hullRatio => hull / maxHull;
+
+  static String _itemName(String itemId) =>
+      WeaponCatalog.byId(itemId)?.name ?? itemId;
 }
 
 final battleHudProvider =

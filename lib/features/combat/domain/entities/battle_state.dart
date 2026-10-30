@@ -2,6 +2,7 @@ import '../../../ship/domain/ship_state.dart';
 import '../../../ship/domain/weapon_definition.dart';
 import '../events/battle_event.dart';
 import 'boss_state.dart';
+import 'dropped_item.dart';
 
 enum BattleStatus { notStarted, inProgress, completed }
 
@@ -11,10 +12,21 @@ enum BattleStatus { notStarted, inProgress, completed }
 /// leaving the arena); every rule decision happens here and is returned as
 /// [BattleEvent]s.
 class BattleState {
-  BattleState({required this.ship, required this.boss});
+  BattleState({
+    required this.ship,
+    required this.boss,
+    this.dropLifetime = defaultDropLifetime,
+  });
+
+  /// Seconds a drop stays on the battlefield before it is lost.
+  static const defaultDropLifetime = 8.0;
 
   final ShipState ship;
   final BossState boss;
+  final double dropLifetime;
+  final Map<int, DroppedItem> _drops = {};
+  final List<String> _collectedItemIds = [];
+  int _nextDropId = 0;
 
   /// Projectiles that were fired and have not been resolved yet. A projectile
   /// leaves its map on first resolution, which makes duplicate collision
@@ -34,6 +46,12 @@ class BattleState {
   double get elapsed => _elapsed;
   int get shotsFired => _shotsFired;
   int get hitsLanded => _hitsLanded;
+  Iterable<DroppedItem> get drops => _drops.values;
+  DroppedItem? drop(int dropId) => _drops[dropId];
+
+  /// Items the player actually picked up during this battle.
+  List<String> get collectedItemIds => List.unmodifiable(_collectedItemIds);
+
   bool isProjectileInFlight(int projectileId) =>
       _playerProjectiles.containsKey(projectileId) ||
       _enemyProjectileDamage.containsKey(projectileId);
@@ -51,8 +69,15 @@ class BattleState {
     _elapsed += dt;
     ship.update(dt);
 
+    final events = <BattleEvent>[];
+    for (final drop in _drops.values) {
+      if (drop.tick(dt)) {
+        events.add(ItemExpired(dropId: drop.id, itemId: drop.itemId));
+      }
+    }
+
     final bossUpdate = boss.update(dt, targetX: ship.x, targetY: ship.y);
-    final events = <BattleEvent>[...bossUpdate.events];
+    events.addAll(bossUpdate.events);
     for (final shot in bossUpdate.shots) {
       final projectileId = _nextProjectileId++;
       _enemyProjectileDamage[projectileId] = shot.damage;
@@ -108,6 +133,13 @@ class BattleState {
 
     _playerProjectiles.remove(projectileId);
     _hitsLanded++;
+    for (final destroyed
+        in events.whereType<BossComponentDestroyed>().toList()) {
+      final itemId = boss.definition
+          .component(destroyed.componentId)
+          .dropItemId;
+      if (itemId != null) events.add(_spawnDrop(itemId, destroyed.componentId));
+    }
     if (boss.phase == BossPhase.defeated) {
       _complete(BattleOutcome.victory, events);
     }
@@ -132,17 +164,52 @@ class BattleState {
     return events;
   }
 
+  /// Resolves the ship touching a drop. The item is granted at most once and
+  /// only while the drop is still available and the battle is running.
+  List<BattleEvent> collectDrop(int dropId) {
+    if (_status != BattleStatus.inProgress) return const [];
+    final drop = _drops[dropId];
+    if (drop == null || !drop.collect()) return const [];
+    _collectedItemIds.add(drop.itemId);
+    return [ItemCollected(dropId: drop.id, itemId: drop.itemId)];
+  }
+
   /// Forgets a projectile that left the arena without hitting anything.
   void discardProjectile(int projectileId) {
     _playerProjectiles.remove(projectileId);
     _enemyProjectileDamage.remove(projectileId);
   }
 
+  ItemDropped _spawnDrop(String itemId, String componentId) {
+    final (x, y) = boss.componentPosition(componentId);
+    final drop = DroppedItem(
+      id: _nextDropId++,
+      itemId: itemId,
+      x: x,
+      y: y,
+      lifetime: dropLifetime,
+    );
+    _drops[drop.id] = drop;
+    return ItemDropped(
+      dropId: drop.id,
+      itemId: itemId,
+      x: x,
+      y: y,
+      lifetime: dropLifetime,
+    );
+  }
+
+  /// Ends the battle. Drops that were not collected are lost.
   void _complete(BattleOutcome outcome, List<BattleEvent> events) {
     _status = BattleStatus.completed;
     _outcome = outcome;
     _playerProjectiles.clear();
     _enemyProjectileDamage.clear();
+    for (final drop in _drops.values) {
+      if (drop.expire()) {
+        events.add(ItemExpired(dropId: drop.id, itemId: drop.itemId));
+      }
+    }
     events.add(BattleCompleted(outcome: outcome));
   }
 }
