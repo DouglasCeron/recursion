@@ -54,6 +54,34 @@ void main() {
     });
   });
 
+  group('hull', () {
+    test('takes damage and becomes briefly invulnerable', () {
+      final ship = newShip();
+
+      expect(ship.receiveDamage(30), 30);
+      expect(ship.hull, 70);
+      expect(ship.isInvulnerable, isTrue);
+      expect(ship.receiveDamage(30), 0);
+
+      ship.update(ship.invulnerabilityDuration);
+      expect(ship.isInvulnerable, isFalse);
+      expect(ship.receiveDamage(30), 30);
+      expect(ship.hull, 40);
+    });
+
+    test('is destroyed at zero and then stops moving and firing', () {
+      final ship = newShip();
+
+      expect(ship.receiveDamage(500), 100);
+      expect(ship.isDestroyed, isTrue);
+      expect(ship.tryFire(), isFalse);
+
+      ship.steerBy(50, 0);
+      ship.update(1);
+      expect(ship.x, 180);
+    });
+  });
+
   group('firing', () {
     test('fires immediately and then respects the weapon interval', () {
       final ship = newShip();

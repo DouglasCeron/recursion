@@ -2,46 +2,85 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/battle_session.dart';
 import '../domain/entities/battle_state.dart';
+import '../domain/entities/boss_state.dart';
+import '../domain/events/battle_event.dart';
 
 final battleSessionProvider = Provider.autoDispose<BattleSession>((ref) {
-  final session = BattleSession.training();
+  final session = BattleSession.boss();
   ref.onDispose(session.dispose);
   return session;
 });
+
+class BossPartHud {
+  const BossPartHud({
+    required this.name,
+    required this.integrity,
+    required this.maxIntegrity,
+  });
+
+  final String name;
+  final int integrity;
+  final int maxIntegrity;
+
+  bool get isDestroyed => integrity == 0;
+  double get ratio => integrity / maxIntegrity;
+}
 
 /// Snapshot of the battle shown by the Flutter HUD. Refreshed on battle
 /// events rather than every frame.
 class BattleHudState {
   const BattleHudState({
     required this.status,
+    required this.outcome,
     required this.weaponName,
-    required this.shotsFired,
-    required this.hitsLanded,
-    required this.targetIntegrity,
-    required this.targetMaxIntegrity,
+    required this.hull,
+    required this.maxHull,
+    required this.bossName,
+    required this.bossParts,
+    required this.bossPattern,
+    required this.coreVulnerable,
+    required this.escapeTimeLeft,
   });
 
   factory BattleHudState.fromBattle(BattleState battle) {
-    final targets = battle.targets;
+    final boss = battle.boss;
     return BattleHudState(
       status: battle.status,
+      outcome: battle.outcome,
       weaponName: battle.ship.weapon.name,
-      shotsFired: battle.shotsFired,
-      hitsLanded: battle.hitsLanded,
-      targetIntegrity: targets.fold(0, (sum, t) => sum + t.integrity),
-      targetMaxIntegrity: targets.fold(0, (sum, t) => sum + t.maxIntegrity),
+      hull: battle.ship.hull,
+      maxHull: battle.ship.maxHull,
+      bossName: boss.definition.name,
+      bossParts: [
+        for (final definition in boss.definition.components)
+          BossPartHud(
+            name: definition.name,
+            integrity: boss.component(definition.id)!.integrity,
+            maxIntegrity: definition.maxIntegrity,
+          ),
+      ],
+      bossPattern: boss.attackPattern,
+      coreVulnerable: boss.isCoreVulnerable,
+      escapeTimeLeft: boss.phase == BossPhase.escaping
+          ? boss.escapeTimeLeft
+          : null,
     );
   }
 
   final BattleStatus status;
+  final BattleOutcome? outcome;
   final String weaponName;
-  final int shotsFired;
-  final int hitsLanded;
-  final int targetIntegrity;
-  final int targetMaxIntegrity;
+  final int hull;
+  final int maxHull;
+  final String bossName;
+  final List<BossPartHud> bossParts;
+  final BossAttackPattern bossPattern;
+  final bool coreVulnerable;
 
-  double get targetIntegrityRatio =>
-      targetMaxIntegrity == 0 ? 0 : targetIntegrity / targetMaxIntegrity;
+  /// Seconds until the boss escapes, or null when no escape is announced.
+  final double? escapeTimeLeft;
+
+  double get hullRatio => hull / maxHull;
 }
 
 final battleHudProvider =

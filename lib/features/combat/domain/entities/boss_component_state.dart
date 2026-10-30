@@ -1,6 +1,10 @@
 import '../rules/damage_rules.dart';
 
-/// Result of applying damage to a [TargetState].
+/// Kinds of boss parts. Each kind carries different rules: losing the cannon
+/// changes the attack pattern and destroying the core defeats the boss.
+enum BossComponentKind { cannon, armor, core }
+
+/// Result of applying damage to a [BossComponentState].
 class DamageOutcome {
   const DamageOutcome({
     required this.damageApplied,
@@ -17,24 +21,28 @@ class DamageOutcome {
   final int damageApplied;
   final int remainingIntegrity;
 
-  /// True only for the hit that moved the target into the destroyed state.
+  /// True only for the hit that moved the component into the destroyed state.
   final bool destroyedNow;
 }
 
-/// A simple destructible target with its own integrity.
-class TargetState {
-  TargetState({required this.id, required this.maxIntegrity})
-    : assert(maxIntegrity > 0),
-      _integrity = maxIntegrity;
+/// Runtime integrity of one destructible boss part.
+class BossComponentState {
+  BossComponentState({
+    required this.id,
+    required this.kind,
+    required this.maxIntegrity,
+  }) : assert(maxIntegrity > 0),
+       _integrity = maxIntegrity;
 
   final String id;
+  final BossComponentKind kind;
   final int maxIntegrity;
   int _integrity;
 
   int get integrity => _integrity;
   bool get isDestroyed => _integrity == 0;
 
-  /// Applies [damage]. Hits on an already destroyed target are ignored, so
+  /// Applies [damage]. Hits on an already destroyed component are ignored, so
   /// destruction is reported exactly once.
   DamageOutcome receiveDamage(int damage) {
     if (isDestroyed) return DamageOutcome.ignored;

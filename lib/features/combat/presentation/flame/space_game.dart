@@ -8,9 +8,10 @@ import 'package:flame/game.dart';
 import '../../application/battle_session.dart';
 import '../../domain/events/battle_event.dart';
 import 'arena_component.dart';
+import 'boss_component.dart';
+import 'enemy_projectile_component.dart';
 import 'player_ship_component.dart';
 import 'projectile_component.dart';
-import 'target_component.dart';
 
 /// Flame integration for a battle: renders the arena and forwards input and
 /// collisions to [session], which owns the authoritative battle state.
@@ -27,7 +28,8 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
   static const _maxStep = 1 / 20;
 
   final BattleSession session;
-  final Map<String, TargetComponent> _targets = {};
+  late final PlayerShipComponent _ship;
+  late final BossComponent _boss;
   StreamSubscription<BattleEvent>? _subscription;
 
   @override
@@ -44,16 +46,9 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
         onDrag: session.steerShip,
       ),
     );
-    world.add(PlayerShipComponent(ship: session.state.ship));
-    for (final target in session.state.targets) {
-      final component = TargetComponent(
-        target: target,
-        position: Vector2(arena.width / 2, arena.height * 0.2),
-        driftRange: arena.width * 0.25,
-      );
-      _targets[target.id] = component;
-      world.add(component);
-    }
+    _ship = PlayerShipComponent(ship: session.state.ship);
+    _boss = BossComponent(boss: session.state.boss);
+    world.addAll([_ship, _boss]);
 
     _subscription = session.events.listen(_onBattleEvent);
   }
@@ -84,10 +79,39 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
             speed: event.projectileSpeed,
           ),
         );
-      case TargetDestroyed():
-        _targets.remove(event.targetId)?.explode();
-      case BattleStarted() || TargetHit() || BattleCompleted():
+      case EnemyFired():
+        world.add(
+          EnemyProjectileComponent(
+            projectileId: event.projectileId,
+            origin: Vector2(event.originX, event.originY),
+            velocity: Vector2(event.velocityX, event.velocityY),
+          ),
+        );
+      case BossComponentDestroyed():
+        _boss.onPartDestroyed(event.componentId);
+      case BossDefeated():
+        _boss.explode();
+      case BossEscaped():
+        _boss.flyAway();
+      case ShipDestroyed():
+        _ship.explode();
+      case BattleCompleted():
+        _clearProjectiles();
+      case BattleStarted() ||
+          BossComponentHit() ||
+          BossBehaviorChanged() ||
+          WeakPointExposed() ||
+          WeakPointClosed() ||
+          BossEscapeWarning() ||
+          ShipHit():
         break;
     }
+  }
+
+  void _clearProjectiles() {
+    world.children
+        .where((c) => c is ProjectileComponent || c is EnemyProjectileComponent)
+        .toList()
+        .forEach((c) => c.removeFromParent());
   }
 }

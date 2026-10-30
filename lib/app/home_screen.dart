@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
               FilledButton(
                 onPressed: () =>
                     Navigator.of(context).pushNamed(AppRoutes.battle),
-                child: const Text('Start training'),
+                child: const Text('Start battle'),
               ),
             ],
           ),

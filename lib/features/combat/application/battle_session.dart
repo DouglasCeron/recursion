@@ -3,8 +3,10 @@ import 'dart:async';
 import '../../../core/geometry/arena_bounds.dart';
 import '../../ship/domain/ship_state.dart';
 import '../../ship/domain/weapon_catalog.dart';
+import '../domain/content/boss_catalog.dart';
 import '../domain/entities/battle_state.dart';
-import '../domain/entities/target_state.dart';
+import '../domain/entities/boss_definition.dart';
+import '../domain/entities/boss_state.dart';
 import '../domain/events/battle_event.dart';
 
 /// Coordinates a single battle: forwards player/game input to the
@@ -12,17 +14,17 @@ import '../domain/events/battle_event.dart';
 class BattleSession {
   BattleSession(this.state);
 
-  /// The training encounter: one static target to shoot at.
-  factory BattleSession.training({ArenaBounds arena = ArenaBounds.standard}) {
+  factory BattleSession.boss({
+    BossDefinition boss = BossCatalog.sentinel,
+    ArenaBounds arena = ArenaBounds.standard,
+  }) {
     return BattleSession(
       BattleState(
         ship: ShipState(arena: arena, weapon: WeaponCatalog.blaster),
-        targets: [TargetState(id: trainingTargetId, maxIntegrity: 300)],
+        boss: BossState(definition: boss, arena: arena),
       ),
     );
   }
-
-  static const trainingTargetId = 'target.training_drone';
 
   final BattleState state;
   final _events = StreamController<BattleEvent>.broadcast(sync: true);
@@ -39,10 +41,17 @@ class BattleSession {
     state.ship.steerBy(dx, dy);
   }
 
-  void reportHit({required int projectileId, required String targetId}) =>
-      _publish(
-        state.resolveHit(projectileId: projectileId, targetId: targetId),
-      );
+  /// Reports a player projectile touching a boss part. Returns whether the
+  /// projectile was consumed; if not, it should keep flying.
+  bool reportHit({required int projectileId, required String componentId}) {
+    _publish(
+      state.resolveHit(projectileId: projectileId, componentId: componentId),
+    );
+    return !state.isProjectileInFlight(projectileId);
+  }
+
+  void reportShipHit(int projectileId) =>
+      _publish(state.resolveShipHit(projectileId: projectileId));
 
   void reportProjectileLeftArena(int projectileId) =>
       state.discardProjectile(projectileId);

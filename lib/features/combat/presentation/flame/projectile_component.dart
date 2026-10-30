@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 
+import 'boss_component.dart';
 import 'space_game.dart';
-import 'target_component.dart';
 
 /// A player projectile. It only moves and reports collisions; damage is
 /// decided by the battle state using [projectileId].
@@ -52,12 +52,13 @@ class ProjectileComponent extends PositionComponent
     PositionComponent other,
   ) {
     super.onCollisionStart(intersectionPoints, other);
-    if (_resolved || other is! TargetComponent) return;
-    _resolved = true;
-    game.session.reportHit(
+    if (_resolved || other is! BossPartComponent) return;
+    final consumed = game.session.reportHit(
       projectileId: projectileId,
-      targetId: other.targetId,
+      componentId: other.componentId,
     );
+    if (!consumed) return;
+    _resolved = true;
     removeFromParent();
   }
 }
