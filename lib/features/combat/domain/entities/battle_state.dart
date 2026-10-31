@@ -157,6 +157,7 @@ class BattleState {
       componentId: componentId,
       projectileId: projectileId,
       baseDamage: weapon.damage,
+      weaponType: weapon.type,
     );
     if (events == null) return const [];
 

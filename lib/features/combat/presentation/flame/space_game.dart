@@ -125,6 +125,8 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
           BossEscapeWarning() ||
           ObserverHit() ||
           ObserverTransmitted() ||
+          CoreShieldDropped() ||
+          CoreShieldRestored() ||
           ShipHit():
         break;
     }

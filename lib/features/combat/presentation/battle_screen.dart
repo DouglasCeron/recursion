@@ -9,7 +9,9 @@ import 'battle_providers.dart';
 import 'flame/space_game.dart';
 
 class BattleScreen extends ConsumerStatefulWidget {
-  const BattleScreen({super.key});
+  const BattleScreen({required this.bossId, super.key});
+
+  final String bossId;
 
   @override
   ConsumerState<BattleScreen> createState() => _BattleScreenState();
@@ -20,11 +22,11 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(battleSessionProvider);
+    final session = ref.watch(battleSessionProvider(widget.bossId));
     final game = _game?.session == session
         ? _game!
         : _game = SpaceGame(session: session);
-    final hud = ref.watch(battleHudProvider);
+    final hud = ref.watch(battleHudProvider(widget.bossId));
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -40,7 +42,8 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
               collectedItems: hud.collectedItems,
               lostItems: hud.lostItems,
               intelTransmitted: hud.intelTransmitted,
-              onRestart: () => ref.invalidate(battleSessionProvider),
+              onRestart: () =>
+                  ref.invalidate(battleSessionProvider(widget.bossId)),
               onExit: () => Navigator.of(context).pop(),
             ),
         ],
@@ -86,7 +89,25 @@ class _BattleHud extends StatelessWidget {
                 maxIntegrity: hud.observerMaxIntegrity,
               ),
             ),
+            if (_adaptations(hud) case final adaptations?) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Adapted: $adaptations',
+                style: textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFF4DD0E1),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
+            if (hud.hasCoreShield && hud.shieldBreakTimeLeft > 0) ...[
+              _Banner(
+                text:
+                    'SHIELD DOWN '
+                    '${hud.shieldBreakTimeLeft.toStringAsFixed(1)}s',
+                color: const Color(0xFF4DD0E1),
+              ),
+              const SizedBox(height: 6),
+            ],
             if (escapeTimeLeft != null)
               _Banner(
                 text: 'ESCAPE IN ${escapeTimeLeft.toStringAsFixed(1)}s',
@@ -122,6 +143,18 @@ class _BattleHud extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Short description of the countermeasures affecting the player now.
+  static String? _adaptations(BattleHudState hud) {
+    final parts = [
+      if (hud.weaponDamageMultiplier < 1)
+        '${hud.weaponName} '
+            '−${((1 - hud.weaponDamageMultiplier) * 100).round()}%',
+      if (hud.coreWindowShortened)
+        'core window ${hud.coreWindowOpenDuration.toStringAsFixed(0)}s',
+    ];
+    return parts.isEmpty ? null : parts.join('  •  ');
   }
 }
 

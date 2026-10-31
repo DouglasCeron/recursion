@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 
 import '../../../../core/geometry/arena_bounds.dart';
+import '../../../ship/domain/weapon_definition.dart';
 import '../events/battle_event.dart';
 import '../rules/damage_rules.dart';
+import '../rules/vulnerability_window.dart';
 import 'boss_component_state.dart';
 import 'boss_definition.dart';
+import 'boss_modifiers.dart';
 
 enum BossPhase { engaged, escaping, escaped, defeated }
 
@@ -31,22 +34,38 @@ typedef BossUpdate = ({List<BattleEvent> events, List<EnemyShot> shots});
 
 /// Authoritative runtime state of a boss and its destructible parts.
 class BossState {
-  BossState({required this.definition, required this.arena})
-    : y = arena.height * definition.verticalPosition,
-      _x = arena.width / 2,
-      _attackCooldown = definition.initialAttackDelay,
-      _components = {
-        for (final c in definition.components)
-          c.id: BossComponentState(
-            id: c.id,
-            kind: c.kind,
-            maxIntegrity: c.maxIntegrity,
-          ),
-      };
+  BossState({
+    required this.definition,
+    required this.arena,
+    this.modifiers = BossModifiers.none,
+  }) : y = arena.height * definition.verticalPosition,
+       coreWindow = modifiers.coreWindowOpenDuration == null
+           ? definition.coreWindow
+           : VulnerabilityWindow(
+               period: definition.coreWindow.period,
+               openDuration: math.min(
+                 modifiers.coreWindowOpenDuration!,
+                 definition.coreWindow.period,
+               ),
+             ),
+       _x = arena.width / 2,
+       _attackCooldown = definition.initialAttackDelay,
+       _components = {
+         for (final c in definition.components)
+           c.id: BossComponentState(
+             id: c.id,
+             kind: c.kind,
+             maxIntegrity: c.maxIntegrity,
+           ),
+       };
 
   final BossDefinition definition;
   final ArenaBounds arena;
+  final BossModifiers modifiers;
   final double y;
+
+  /// Core exposure schedule for this battle, after modifiers.
+  final VulnerabilityWindow coreWindow;
   final Map<String, BossComponentState> _components;
 
   double _x;
@@ -54,27 +73,40 @@ class BossState {
   double _driftPhase = 0;
   double _attackCooldown;
   double _escapeTimeLeft = 0;
+  double _shieldBreakTimeLeft = 0;
+  int _nextCannon = 0;
   bool _coreWasVulnerable = false;
   BossPhase _phase = BossPhase.engaged;
 
   double get x => _x;
   BossPhase get phase => _phase;
   double get escapeTimeLeft => _escapeTimeLeft;
+  double get shieldBreakTimeLeft => _shieldBreakTimeLeft;
   bool get isActive =>
       _phase == BossPhase.engaged || _phase == BossPhase.escaping;
   Iterable<BossComponentState> get components => _components.values;
   BossComponentState? component(String id) => _components[id];
 
-  bool get isCannonOperational => _components.values.any(
-    (c) => c.kind == BossComponentKind.cannon && !c.isDestroyed,
-  );
+  List<BossComponentDefinition> get _operationalCannons => [
+    for (final c in definition.components)
+      if (c.kind == BossComponentKind.cannon && !_components[c.id]!.isDestroyed)
+        c,
+  ];
+
+  bool get isCannonOperational => _operationalCannons.isNotEmpty;
 
   BossAttackPattern get attackPattern => isCannonOperational
       ? BossAttackPattern.aimedCannon
       : BossAttackPattern.radialBurst;
 
+  /// Whether the core currently ignores all damage.
+  bool get isCoreShielded =>
+      definition.hasCoreShield &&
+      isCannonOperational &&
+      _shieldBreakTimeLeft <= 0;
+
   bool get isCoreVulnerable =>
-      isActive && definition.coreWindow.isOpenAt(_time);
+      isActive && !isCoreShielded && coreWindow.isOpenAt(_time);
 
   /// Current arena position of a part's center.
   (double, double) componentPosition(String id) {
@@ -87,8 +119,8 @@ class BossState {
   int get totalMaxIntegrity =>
       _components.values.fold(0, (sum, c) => sum + c.maxIntegrity);
 
-  /// Advances movement, weak point schedule, escape countdown and attacks.
-  /// [targetX]/[targetY] is the ship position used for aimed shots.
+  /// Advances movement, shield, weak point schedule, escape countdown and
+  /// attacks. [targetX]/[targetY] is the ship position used for aimed shots.
   BossUpdate update(
     double dt, {
     required double targetX,
@@ -105,6 +137,11 @@ class BossState {
     _x =
         arena.width / 2 +
         math.sin(_driftPhase) * arena.width * definition.driftRange;
+
+    if (_shieldBreakTimeLeft > 0) {
+      _shieldBreakTimeLeft = math.max(0, _shieldBreakTimeLeft - dt);
+      if (isCoreShielded) events.add(const CoreShieldRestored());
+    }
 
     final vulnerable = isCoreVulnerable;
     if (vulnerable != _coreWasVulnerable) {
@@ -138,25 +175,47 @@ class BossState {
     return (events: events, shots: shots);
   }
 
-  /// Applies a hit with [baseDamage] to [componentId].
+  /// Applies a hit from a [weaponType] weapon with [baseDamage] to
+  /// [componentId].
   ///
   /// Returns `null` when the hit is not accepted (unknown or destroyed part,
   /// boss no longer active), so the caller can keep the projectile alive.
+  /// A shielded core accepts the hit but takes no damage.
   List<BattleEvent>? applyHit({
     required String componentId,
     required int projectileId,
     required int baseDamage,
+    required WeaponType weaponType,
   }) {
     if (!isActive) return null;
     final component = _components[componentId];
     if (component == null || component.isDestroyed) return null;
 
-    final weakPointBonus =
-        component.kind == BossComponentKind.core && isCoreVulnerable;
+    final isCore = component.kind == BossComponentKind.core;
+    if (isCore && isCoreShielded) {
+      return [
+        BossComponentHit(
+          componentId: componentId,
+          projectileId: projectileId,
+          damage: 0,
+          remainingIntegrity: component.integrity,
+          weakPointBonus: false,
+          blocked: true,
+        ),
+      ];
+    }
+
+    final weakPointBonus = isCore && isCoreVulnerable;
+    // An exposed core always takes full damage, whatever the adaptations.
+    final resistance = weakPointBonus
+        ? 1.0
+        : modifiers.damageMultiplierFor(weaponType);
     final outcome = component.receiveDamage(
       DamageRules.damageFor(
         baseDamage: baseDamage,
-        multiplier: weakPointBonus ? definition.coreVulnerableMultiplier : 1,
+        multiplier:
+            (weakPointBonus ? definition.coreVulnerableMultiplier : 1) *
+            resistance,
       ),
     );
     final events = <BattleEvent>[
@@ -166,6 +225,7 @@ class BossState {
         damage: outcome.damageApplied,
         remainingIntegrity: outcome.remainingIntegrity,
         weakPointBonus: weakPointBonus,
+        resisted: resistance < 1,
       ),
     ];
 
@@ -178,9 +238,9 @@ class BossState {
           _phase = BossPhase.defeated;
           events.add(const BossDefeated());
           return events;
-        case BossComponentKind.cannon when !isCannonOperational:
-          events.add(BossBehaviorChanged(pattern: attackPattern));
-        case BossComponentKind.cannon || BossComponentKind.armor:
+        case BossComponentKind.cannon:
+          events.addAll(_onCannonDestroyed());
+        case BossComponentKind.armor:
           break;
       }
     }
@@ -198,10 +258,25 @@ class BossState {
     return events;
   }
 
+  List<BattleEvent> _onCannonDestroyed() {
+    final lastCannon = !isCannonOperational;
+    final shieldBreak = definition.shieldBreakDuration;
+    final events = <BattleEvent>[];
+    if (lastCannon) events.add(BossBehaviorChanged(pattern: attackPattern));
+    if (shieldBreak == null) return events;
+    if (lastCannon) {
+      _shieldBreakTimeLeft = 0;
+      events.add(const CoreShieldDropped(duration: null));
+    } else {
+      _shieldBreakTimeLeft = shieldBreak;
+      events.add(CoreShieldDropped(duration: shieldBreak));
+    }
+    return events;
+  }
+
   EnemyShot _aimedShot(double targetX, double targetY) {
-    final cannon = definition.components.firstWhere(
-      (c) => c.kind == BossComponentKind.cannon,
-    );
+    final cannons = _operationalCannons;
+    final cannon = cannons[_nextCannon++ % cannons.length];
     final originX = _x + cannon.offsetX;
     final originY = y + cannon.offsetY + cannon.height / 2;
     final dx = targetX - originX;

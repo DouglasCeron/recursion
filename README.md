@@ -15,7 +15,7 @@ The proof of concept is built in stages:
 | 2 | Modular boss (cannon, armor, core), vulnerability window, flagged escape | Done |
 | 3 | Component drops, in-battle collection, inventory and loadout | Done |
 | 4 | Observer drone, weapon exposure profile, intel transmission | Done |
-| 5 | Second, adaptive boss driven by transmitted intel | Pending |
+| 5 | Second, adaptive boss driven by transmitted intel | Done |
 | 6 | Local persistence (versioned JSON), validation and docs | Pending |
 
 ## Requirements
@@ -28,7 +28,9 @@ The proof of concept is built in stages:
 ```sh
 flutter pub get
 flutter run                    # opens the main menu
-flutter run --route /battle    # jumps straight into the boss battle
+flutter run --route /battle    # jumps straight into the Sentinel battle
+flutter run --route "/battle?boss=boss.warden"    # straight into the Warden
+flutter run --route "/briefing?boss=boss.warden"  # the Warden briefing
 ```
 
 Controls: drag anywhere on the screen to move the ship; weapons fire
@@ -138,14 +140,51 @@ Rules:
 - Metrics are aggregated in memory during the battle; nothing is written per
   shot. Intel currently lives in memory and resets on restart until stage 6.
 
+## Second boss: Warden (adaptive)
+
+Unlocked after the first Sentinel battle, whatever its outcome. The menu has
+one button per boss; the Warden opens a briefing screen first.
+
+| Part | Integrity | Rule |
+|---|---|---|
+| Core | 360 | Destroying it defeats the boss. Shielded while any cannon works. |
+| Left / right cannon | 120 each | Fire aimed shots in turns (0.9 s, 12 damage). |
+
+- **Shield:** blocks all core damage. Destroying a cannon drops it for
+  **3 s**; destroying both drops it for good and switches the attack to a
+  7-shot burst (100° spread, every 1.6 s, 8 damage each).
+- The core still uses the 8 s vulnerability window (×2 while exposed), but
+  it is only exposed when the shield is down.
+- Escape follows the same rule as the Sentinel (25% total integrity, 5 s).
+
+Only the Warden adapts, and only from the **latest intel report** (never from
+the inventory):
+
+| Observed | Countermeasure |
+|---|---|
+| Heavy Cannon medium / high | Impact plating: −20% / −40% damage from it |
+| Blaster medium / high | Deflector screen: −15% / −30% damage from it |
+| Weak point exploited | Core exposure shortened from 3 s to 2 s |
+
+- Reductions never exceed **40%**, and a fully **exposed core always takes
+  full (×2) damage**, so every build can still win.
+- Low exposure, unused or merely owned weapons are never countered. Without
+  any intel, the Warden fights with its default setup.
+- The briefing lists each countermeasure and its reason. In battle, adapted
+  parts get a cyan outline, the core shows a shield ring while shielded, and
+  the HUD shows the active reductions and the shield-down countdown.
+- The combat domain only sees neutral `BossModifiers`; the rules that build
+  them live in `boss_evolution` (`AdaptationRules`).
+
 ## Tests
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
   escape rule, boss behavior, drops, observer, battle record, exposure
-  profile, intel, ship movement/firing/hull, battle state, inventory and
-  loadout).
+  profile, intel, adaptation rules, Warden shield and modifiers, boss
+  unlocks, ship movement/firing/hull, battle state, inventory and loadout).
 - `test/integration/` — full boss battles (victory and escape) played through
-  `BattleSession`, drop collection wired to the inventory, and observer
-  transmissions reaching (or not reaching) the enemy intel through Riverpod,
-  all without rendering.
-- `test/widget/` — app smoke test.
+  `BattleSession`, drop collection wired to the inventory, observer
+  transmissions reaching (or not reaching) the enemy intel, and different
+  weapon usage producing different Warden setups through Riverpod, all
+  without rendering.
+- `test/widget/` — home screen smoke test (boss buttons and lock).

@@ -105,6 +105,14 @@ class BossPartComponent extends PositionComponent {
     ..color = const Color(0x66FF4D6D)
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
   static final _escapeTintPaint = Paint()..color = const Color(0x55FFD54F);
+  static final _shieldPaint = Paint()
+    ..color = const Color(0xAA4DD0E1)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3;
+  static final _adaptedPaint = Paint()
+    ..color = const Color(0xFF4DD0E1)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
 
   @override
   Future<void> onLoad() async {
@@ -141,6 +149,9 @@ class BossPartComponent extends PositionComponent {
         } else {
           canvas.drawCircle(center, radius, _coreClosedPaint);
         }
+        if (boss.isCoreShielded) {
+          canvas.drawCircle(center, radius + 6, _shieldPaint);
+        }
       case BossComponentKind.armor:
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(4)),
@@ -148,6 +159,10 @@ class BossPartComponent extends PositionComponent {
         );
       case BossComponentKind.cannon:
         canvas.drawRect(rect, _cannonPaint);
+    }
+    if (boss.modifiers.damageMultipliers.isNotEmpty &&
+        definition.kind != BossComponentKind.core) {
+      canvas.drawRect(rect.inflate(2), _adaptedPaint);
     }
     if (boss.phase == BossPhase.escaping && (boss.escapeTimeLeft * 4) % 2 < 1) {
       canvas.drawRect(rect, _escapeTintPaint);

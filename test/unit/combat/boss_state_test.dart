@@ -5,6 +5,7 @@ import 'package:recursion/core/geometry/arena_bounds.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/boss_state.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
+import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
 void main() {
   const arena = ArenaBounds.standard;
@@ -21,6 +22,7 @@ void main() {
         componentId: id,
         projectileId: nextProjectile++,
         baseDamage: damage,
+        weaponType: WeaponType.blaster,
       );
 
   BossUpdate tick(BossState boss, double dt) =>

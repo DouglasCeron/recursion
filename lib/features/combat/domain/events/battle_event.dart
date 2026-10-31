@@ -56,6 +56,8 @@ class BossComponentHit extends BattleEvent {
     required this.damage,
     required this.remainingIntegrity,
     required this.weakPointBonus,
+    this.resisted = false,
+    this.blocked = false,
   });
 
   final String componentId;
@@ -65,6 +67,23 @@ class BossComponentHit extends BattleEvent {
 
   /// Whether the exposed-core multiplier was applied to this hit.
   final bool weakPointBonus;
+
+  /// Whether an adaptation reduced this hit's damage.
+  final bool resisted;
+
+  /// Whether the core shield absorbed the hit entirely.
+  final bool blocked;
+}
+
+class CoreShieldDropped extends BattleEvent {
+  const CoreShieldDropped({required this.duration});
+
+  /// Seconds until the shield returns, or null if it is down for good.
+  final double? duration;
+}
+
+class CoreShieldRestored extends BattleEvent {
+  const CoreShieldRestored();
 }
 
 class BossComponentDestroyed extends BattleEvent {

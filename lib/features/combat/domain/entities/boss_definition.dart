@@ -76,6 +76,7 @@ class BossDefinition {
     required this.driftRange,
     required this.driftSpeed,
     required this.enragedDriftSpeed,
+    this.shieldBreakDuration,
   });
 
   final String id;
@@ -101,6 +102,13 @@ class BossDefinition {
   /// Drift angular speed (radians per second) with and without the cannon.
   final double driftSpeed;
   final double enragedDriftSpeed;
+
+  /// If set, the core is shielded (immune) while any cannon is operational.
+  /// Destroying a cannon drops the shield for this many seconds; once no
+  /// cannon is left the shield stays down.
+  final double? shieldBreakDuration;
+
+  bool get hasCoreShield => shieldBreakDuration != null;
 
   BossComponentDefinition component(String id) =>
       components.firstWhere((c) => c.id == id);

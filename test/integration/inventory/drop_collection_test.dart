@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/combat/application/battle_session.dart';
+import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/combat/presentation/battle_providers.dart';
 import 'package:recursion/features/inventory/application/inventory_controller.dart';
@@ -8,13 +9,14 @@ import 'package:recursion/features/ship/domain/weapon_catalog.dart';
 import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
 const _cannonId = 'sentinel.cannon';
+final _sentinel = BossCatalog.sentinel.id;
 const _step = 1 / 60;
 
 /// Plays the current battle, hitting the cannon until it drops its item.
 ({BattleSession session, ItemDropped drop, List<BattleEvent> events})
 breakCannon(ProviderContainer container) {
-  container.listen(battleSessionProvider, (_, _) {});
-  final session = container.read(battleSessionProvider);
+  container.listen(battleSessionProvider(_sentinel), (_, _) {});
+  final session = container.read(battleSessionProvider(_sentinel));
   final events = <BattleEvent>[];
   session.events.listen(events.add);
   session.start();
@@ -71,8 +73,8 @@ void main() {
         .equipWeapon(heavyId);
     expect(equipped, isTrue);
 
-    container.invalidate(battleSessionProvider);
-    final nextBattle = container.read(battleSessionProvider);
+    container.invalidate(battleSessionProvider(_sentinel));
+    final nextBattle = container.read(battleSessionProvider(_sentinel));
     final fired = <WeaponFired>[];
     nextBattle.events.listen((e) {
       if (e is WeaponFired) fired.add(e);

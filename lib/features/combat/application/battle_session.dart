@@ -7,6 +7,7 @@ import '../../ship/domain/weapon_definition.dart';
 import '../domain/content/boss_catalog.dart';
 import '../domain/entities/battle_state.dart';
 import '../domain/entities/boss_definition.dart';
+import '../domain/entities/boss_modifiers.dart';
 import '../domain/entities/boss_state.dart';
 import '../domain/events/battle_event.dart';
 
@@ -17,13 +18,14 @@ class BattleSession {
 
   factory BattleSession.boss({
     BossDefinition boss = BossCatalog.sentinel,
+    BossModifiers modifiers = BossModifiers.none,
     WeaponDefinition weapon = WeaponCatalog.blaster,
     ArenaBounds arena = ArenaBounds.standard,
   }) {
     return BattleSession(
       BattleState(
         ship: ShipState(arena: arena, weapon: weapon),
-        boss: BossState(definition: boss, arena: arena),
+        boss: BossState(definition: boss, arena: arena, modifiers: modifiers),
       ),
     );
   }
