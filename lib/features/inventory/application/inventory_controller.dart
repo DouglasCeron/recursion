@@ -7,6 +7,11 @@ import '../domain/inventory.dart';
 class PlayerInventoryState {
   const PlayerInventoryState({required this.inventory, required this.loadout});
 
+  factory PlayerInventoryState.starter() => PlayerInventoryState(
+    inventory: Inventory.starter(),
+    loadout: Loadout.starter(),
+  );
+
   final Inventory inventory;
   final Loadout loadout;
 
@@ -19,6 +24,11 @@ class PlayerInventoryState {
   ];
 }
 
+/// State the inventory starts from; overridden with the restored save.
+final initialInventoryStateProvider = Provider<PlayerInventoryState>(
+  (ref) => PlayerInventoryState.starter(),
+);
+
 final inventoryControllerProvider =
     NotifierProvider<InventoryController, PlayerInventoryState>(
       InventoryController.new,
@@ -27,10 +37,7 @@ final inventoryControllerProvider =
 /// Use cases for the player's items: collecting drops and equipping weapons.
 class InventoryController extends Notifier<PlayerInventoryState> {
   @override
-  PlayerInventoryState build() => PlayerInventoryState(
-    inventory: Inventory.starter(),
-    loadout: Loadout.starter(),
-  );
+  PlayerInventoryState build() => ref.read(initialInventoryStateProvider);
 
   /// Adds a collected item. Returns false if it was already owned.
   bool collect(String itemId) {

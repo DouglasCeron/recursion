@@ -16,7 +16,7 @@ The proof of concept is built in stages:
 | 3 | Component drops, in-battle collection, inventory and loadout | Done |
 | 4 | Observer drone, weapon exposure profile, intel transmission | Done |
 | 5 | Second, adaptive boss driven by transmitted intel | Done |
-| 6 | Local persistence (versioned JSON), validation and docs | Pending |
+| 6 | Local persistence (versioned JSON), validation and docs | Done |
 
 ## Requirements
 
@@ -36,12 +36,19 @@ flutter run --route "/briefing?boss=boss.warden"  # the Warden briefing
 Controls: drag anywhere on the screen to move the ship; weapons fire
 automatically.
 
-## Checks
+Suggested first session: fight the Sentinel (destroy its cannon and touch
+the falling Heavy Cannon to collect it), equip it in Inventory, then fight
+the Warden and read its briefing. Destroy the observer drone on the left edge
+if you do not want the enemy to learn from that battle.
+
+## Checks and builds
 
 ```sh
 dart format lib test
 flutter analyze
 flutter test
+flutter build ios --simulator --debug   # iOS simulator build
+flutter build apk --debug               # Android debug APK
 ```
 
 ## Architecture
@@ -55,7 +62,7 @@ Feature-oriented folders under `lib/features/<feature>/` with these layers:
 - `presentation/` — Flutter screens/HUD (Riverpod) and Flame components under
   `presentation/flame/`. Flame components only render, move visually and
   report collisions; they never decide damage.
-- `infrastructure/` — persistence adapters (added in stage 6).
+- `infrastructure/` — persistence adapters (`save_game` feature).
 
 Shared code lives in `lib/core/`, app wiring (bootstrap, routing, theme) in
 `lib/app/`.
@@ -107,8 +114,6 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 - Collected items are added to the inventory immediately. The weapon to use
   is chosen in the Inventory screen before a battle; it cannot be swapped
   mid-battle.
-- Inventory and loadout currently live in memory only; they reset when the
-  app restarts until persistence lands in stage 6.
 
 ## Observer drone and enemy intel
 
@@ -138,7 +143,7 @@ Rules:
   exposed; at **50% or more** the profile flags the player as exploiting the
   weak point.
 - Metrics are aggregated in memory during the battle; nothing is written per
-  shot. Intel currently lives in memory and resets on restart until stage 6.
+  shot.
 
 ## Second boss: Warden (adaptive)
 
@@ -176,15 +181,48 @@ the inventory):
 - The combat domain only sees neutral `BossModifiers`; the rules that build
   them live in `boss_evolution` (`AdaptationRules`).
 
+## Saving
+
+Inventory, equipped weapon, enemy intel and progress (battles fought, bosses
+fought, last battle record) survive an app restart.
+
+- Stored as one JSON document with a `schemaVersion` (currently 1) in
+  `shared_preferences`, behind the `SaveRepository` interface
+  (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
+  through the same JSON codec.
+- The save is loaded once before the first frame. It is written when
+  persisted state changes: collecting an item, equipping a weapon, receiving
+  intel or finishing a battle. Never per frame.
+- Bad data never crashes the game: a corrupted save, or one written by a
+  newer schema version, starts a new game and is replaced on the next write.
+  Unknown item, boss or weapon ids are dropped, and an equipped weapon that
+  is no longer owned falls back to the Blaster.
+- Schema changes go through `SaveGameCodec.migrations`, one step per version
+  (`migrations[1]` upgrades a v1 document to v2).
+- Features do not know about saving: each controller starts from an
+  `initial...Provider` that the app overrides with the restored save.
+
+## Known limitations
+
+- Prototype content only: two bosses and two weapons (Missile and Laser
+  types exist in the domain but have no content yet).
+- Only one save slot and no way to reset it from the app; uninstalling the
+  app (or clearing its data) starts over.
+- Flame rendering is verified manually; automated tests cover the rules, the
+  battle flow, the providers and the home screen, not what is drawn.
+- The battle HUD is tight with three boss part bars and can overlap the top
+  of the Warden.
+
 ## Tests
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
   escape rule, boss behavior, drops, observer, battle record, exposure
   profile, intel, adaptation rules, Warden shield and modifiers, boss
-  unlocks, ship movement/firing/hull, battle state, inventory and loadout).
+  unlocks, ship movement/firing/hull, battle state, inventory and loadout,
+  save codec and versioning, shared preferences adapter).
 - `test/integration/` — full boss battles (victory and escape) played through
   `BattleSession`, drop collection wired to the inventory, observer
-  transmissions reaching (or not reaching) the enemy intel, and different
-  weapon usage producing different Warden setups through Riverpod, all
-  without rendering.
+  transmissions reaching (or not reaching) the enemy intel, different weapon
+  usage producing different Warden setups, and an app restart restoring the
+  save, all through Riverpod without rendering.
 - `test/widget/` — home screen smoke test (boss buttons and lock).

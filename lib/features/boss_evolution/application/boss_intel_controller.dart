@@ -5,6 +5,11 @@ import '../domain/boss_evolution.dart';
 import '../domain/boss_intel.dart';
 import '../domain/weapon_exposure_profile.dart';
 
+/// Intel the enemy starts with; overridden with the restored save.
+final initialBossIntelProvider = Provider<BossIntel>(
+  (ref) => const BossIntel(),
+);
+
 final bossIntelControllerProvider =
     NotifierProvider<BossIntelController, BossIntel>(BossIntelController.new);
 
@@ -16,7 +21,7 @@ final bossEvolutionProvider = Provider<BossEvolutionState>(
 /// Receives observer transmissions and keeps the enemy faction's knowledge.
 class BossIntelController extends Notifier<BossIntel> {
   @override
-  BossIntel build() => const BossIntel();
+  BossIntel build() => ref.read(initialBossIntelProvider);
 
   void receiveTransmission(CombatStats observed) {
     state = state.withReport(WeaponExposureProfile.fromStats(observed));
