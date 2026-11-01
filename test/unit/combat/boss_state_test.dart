@@ -148,16 +148,24 @@ void main() {
 
   group('escape', () {
     void bringToThreshold(BossState boss) {
-      hit(boss, cannonId, 100);
       hit(boss, armorId, 100);
-      for (final wing in wingIds) {
-        hit(boss, wing, 70);
-      }
-      // Total integrity: 740 max; 400 core left. 215 more reaches 185 (25%).
-      hit(boss, coreId, 214);
+      // Core: 400 max. 279 more leaves 121, just above 30% (120).
+      hit(boss, coreId, 279);
     }
 
-    test('is announced once when total integrity reaches 25%', () {
+    test('destroying every outer part never triggers it', () {
+      final boss = newBoss();
+
+      final events = [
+        for (final id in [cannonId, armorId, ...wingIds])
+          ...hit(boss, id, 1000)!,
+      ];
+
+      expect(events.whereType<BossEscapeWarning>(), isEmpty);
+      expect(boss.phase, BossPhase.engaged);
+    });
+
+    test('is announced once when the core reaches 30%', () {
       final boss = newBoss();
       bringToThreshold(boss);
       expect(boss.phase, BossPhase.engaged);

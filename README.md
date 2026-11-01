@@ -116,8 +116,8 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
 - **Core vulnerability window:** 8 s cycles, closed for 5 s then exposed for
   3 s (first exposure at 5 s). Only core hits during the window get the ×2
   bonus; outside it the core takes normal damage.
-- **Escape:** when the boss's total integrity (sum of all parts, 740 max)
-  drops to 25% (185) or below, it announces the escape (HUD countdown and
+- **Escape:** when the core drops to 30% of its integrity (120 of 400) or
+  below, the boss announces the escape (HUD countdown and
   flashing parts) and leaves 5 s later unless the core is destroyed first.
   The escape is announced at most once.
 - **Ship:** 100 hull. After taking damage it is invulnerable for 0.75 s.
@@ -197,14 +197,14 @@ its outcome. It opens a briefing screen first.
 | Left / right housing | 80 each | Hull in front of each cannon. |
 
 Natural order: housing → cannon (the shield drops) → front plate → core.
-Total integrity is 860, so the escape is announced at 215.
+The escape is announced when the core drops to 30% (108 of 360).
 
 - **Shield:** blocks all core damage. Destroying a cannon drops it for
   **3 s**; destroying both drops it for good and switches the attack to a
   7-shot burst (100° spread, every 1.6 s, 8 damage each).
 - The core still uses the 8 s vulnerability window (×2 while exposed), but
   it is only exposed when the shield is down.
-- Escape follows the same rule as the Sentinel (25% total integrity, 5 s).
+- Escape follows the same rule as the Sentinel (core at 30%, 5 s).
 
 Only the Warden adapts, and only from the **latest intel report** (never from
 the inventory):
@@ -257,9 +257,6 @@ fought and defeated, last battle record) survive an app restart.
   battle flow, the providers and the menu and map screens, not what is drawn.
 - The battle HUD lists one bar per boss part and covers the top of the
   bosses now that they have five or six parts (step 10).
-- Balance: the escape threshold counts every part, and the core is the last
-  one standing. Against an adapted Warden, a Blaster-only build usually
-  cannot finish the core before it escapes.
 
 ## Tests
 

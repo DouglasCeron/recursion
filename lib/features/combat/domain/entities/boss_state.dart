@@ -141,6 +141,9 @@ class BossState {
   int get totalMaxIntegrity =>
       _components.values.fold(0, (sum, c) => sum + c.maxIntegrity);
 
+  BossComponentState get core =>
+      _components.values.firstWhere((c) => c.kind == BossComponentKind.core);
+
   /// Advances movement, shield, weak point schedule, escape countdown and
   /// attacks. [targetX]/[targetY] is the ship position used for aimed shots.
   BossUpdate update(
@@ -274,8 +277,8 @@ class BossState {
     final rule = definition.escapeRule;
     if (_phase == BossPhase.engaged &&
         rule.shouldAnnounce(
-          integrity: totalIntegrity,
-          maxIntegrity: totalMaxIntegrity,
+          integrity: core.integrity,
+          maxIntegrity: core.maxIntegrity,
         )) {
       _phase = BossPhase.escaping;
       _escapeTimeLeft = rule.warningDuration;

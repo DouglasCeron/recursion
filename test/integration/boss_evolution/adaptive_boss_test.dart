@@ -93,43 +93,52 @@ void main() {
     expect(sentinel.modifiers.isAdapted, isFalse);
   });
 
-  test('a Sentinel battle unlocks the Warden, which can then be fought', () {
-    final container = newContainer();
-    expect(
-      container.read(progressControllerProvider).isBossUnlocked(_warden),
-      isFalse,
-    );
-
-    playBattle(container);
-    expect(
-      container.read(progressControllerProvider).isBossUnlocked(_warden),
-      isTrue,
-    );
-
-    final (:session, :events) = playBattle(
-      container,
-      bossId: _warden,
-      targetOrder: _wardenOrder,
-    );
-
-    expect(events.whereType<CoreShieldDropped>(), hasLength(2));
-    expect(events.whereType<BossComponentHit>().any((e) => e.resisted), isTrue);
-    expect(session.state.boss.definition.id, _warden);
-    final destroyed = [
-      for (final e in events.whereType<BossComponentDestroyed>()) e.componentId,
-    ];
-    for (final side in ['left', 'right']) {
+  test(
+    'a Sentinel battle unlocks the Warden, which a countered Blaster can still beat',
+    () {
+      final container = newContainer();
       expect(
-        destroyed.indexOf('warden.housing_$side'),
-        lessThan(destroyed.indexOf('warden.cannon_$side')),
-        reason: 'the $side cannon is only reachable through its housing',
+        container.read(progressControllerProvider).isBossUnlocked(_warden),
+        isFalse,
       );
-    }
-    expect(destroyed, contains('warden.plate'));
-    expect(
-      session.state.outcome,
-      anyOf(BattleOutcome.victory, BattleOutcome.bossEscaped),
-    );
-    expect(container.read(progressControllerProvider).battlesFought, 2);
-  });
+
+      playBattle(container);
+      expect(
+        container.read(progressControllerProvider).isBossUnlocked(_warden),
+        isTrue,
+      );
+
+      final (:session, :events) = playBattle(
+        container,
+        bossId: _warden,
+        targetOrder: _wardenOrder,
+      );
+
+      expect(events.whereType<CoreShieldDropped>(), hasLength(2));
+      expect(
+        events.whereType<BossComponentHit>().any((e) => e.resisted),
+        isTrue,
+      );
+      expect(session.state.boss.definition.id, _warden);
+      final destroyed = [
+        for (final e in events.whereType<BossComponentDestroyed>())
+          e.componentId,
+      ];
+      for (final side in ['left', 'right']) {
+        expect(
+          destroyed.indexOf('warden.housing_$side'),
+          lessThan(destroyed.indexOf('warden.cannon_$side')),
+          reason: 'the $side cannon is only reachable through its housing',
+        );
+      }
+      expect(destroyed, contains('warden.plate'));
+      expect(
+        session.state.boss.modifiers.damageMultiplierFor(WeaponType.blaster),
+        0.7,
+        reason: 'the Warden countered the Blaster',
+      );
+      expect(session.state.outcome, BattleOutcome.victory);
+      expect(container.read(progressControllerProvider).battlesFought, 2);
+    },
+  );
 }

@@ -406,7 +406,7 @@ void main() {
       id: 'test.piercer',
       name: 'Piercer',
       type: WeaponType.heavyCannon,
-      damage: 250,
+      damage: 290,
       fireInterval: 0.1,
       projectileSpeed: 100,
     );
@@ -416,7 +416,7 @@ void main() {
     for (final wing in ['sentinel.hull_left', 'sentinel.hull_right']) {
       battle.resolveHit(projectileId: fireOnce(battle), componentId: wing);
     }
-    // Core closed: 400 - 250 = 150 left, under 25% of the 740 total.
+    // Core closed: 400 - 290 = 110 left, under 30% of its 400.
     final warning = battle.resolveHit(
       projectileId: fireOnce(battle),
       componentId: coreId,

@@ -67,7 +67,7 @@ abstract final class BossCatalog {
     ],
     coreWindow: VulnerabilityWindow(period: 8, openDuration: 3),
     coreVulnerableMultiplier: 2,
-    escapeRule: EscapeRule(integrityThreshold: 0.25, warningDuration: 5),
+    escapeRule: EscapeRule(coreIntegrityThreshold: 0.3, warningDuration: 5),
     aimedShot: AimedShotPattern(interval: 1.2, speed: 260, damage: 15),
     burst: BurstPattern(
       interval: 2,
@@ -157,7 +157,7 @@ abstract final class BossCatalog {
     ],
     coreWindow: VulnerabilityWindow(period: 8, openDuration: 3),
     coreVulnerableMultiplier: 2,
-    escapeRule: EscapeRule(integrityThreshold: 0.25, warningDuration: 5),
+    escapeRule: EscapeRule(coreIntegrityThreshold: 0.3, warningDuration: 5),
     aimedShot: AimedShotPattern(interval: 0.9, speed: 280, damage: 12),
     burst: BurstPattern(
       interval: 1.6,
