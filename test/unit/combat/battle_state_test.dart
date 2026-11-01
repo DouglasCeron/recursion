@@ -135,6 +135,7 @@ void main() {
 
     test('destroying the core wins the battle exactly once', () {
       final battle = newBattle(weapon: breaker);
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
       final killing = fireOnce(battle);
       final late = fireOnce(battle);
 
@@ -277,6 +278,7 @@ void main() {
     test('ending the battle loses uncollected drops', () {
       final battle = newBattle(weapon: breaker);
       final dropId = destroyCannon(battle).dropId;
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
 
       final events = battle.resolveHit(
         projectileId: fireOnce(battle),
@@ -336,6 +338,7 @@ void main() {
     test('a destroyed observer transmits nothing', () {
       final battle = newBattle(weapon: breaker);
       battle.resolveObserverHit(projectileId: fireOnce(battle));
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
 
       final events = battle.resolveHit(
         projectileId: fireOnce(battle),
@@ -365,6 +368,7 @@ void main() {
       final battle = newBattle(weapon: breaker);
       battle.resolveObserverHit(projectileId: fireOnce(battle));
       fireOnce(battle);
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
       battle.resolveHit(projectileId: fireOnce(battle), componentId: coreId);
 
       final record = battle.record;
@@ -374,13 +378,16 @@ void main() {
       expect(record.intelTransmitted, isFalse);
       final usage = record.stats.weapons[WeaponType.heavyCannon]!;
       expect(usage.shots, battle.shotsFired);
-      expect(usage.hits, 2);
-      expect(record.destroyedComponentIds, [coreId]);
+      expect(usage.hits, 3);
+      expect(record.destroyedComponentIds, unorderedEquals([armorId, coreId]));
       expect(record.bossId, BossCatalog.sentinel.id);
     });
 
     test('tracks core damage dealt while exposed', () {
       final battle = newBattle();
+      while (!battle.boss.component(armorId)!.isDestroyed) {
+        battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
+      }
       battle.resolveHit(projectileId: fireOnce(battle), componentId: coreId);
       while (!battle.boss.isCoreVulnerable) {
         battle.update(0.05);
@@ -406,7 +413,10 @@ void main() {
     final battle = newBattle(weapon: piercer);
     battle.resolveHit(projectileId: fireOnce(battle), componentId: cannonId);
     battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
-    // Core closed: 400 - 250 = 150 left, which is 25% of the 600 total.
+    for (final wing in ['sentinel.hull_left', 'sentinel.hull_right']) {
+      battle.resolveHit(projectileId: fireOnce(battle), componentId: wing);
+    }
+    // Core closed: 400 - 250 = 150 left, under 25% of the 740 total.
     final warning = battle.resolveHit(
       projectileId: fireOnce(battle),
       componentId: coreId,

@@ -167,7 +167,7 @@ class BattleState {
     _recordHit(
       weapon.type,
       damage: hit.damage,
-      onCore: boss.component(componentId)!.kind == BossComponentKind.core,
+      onCore: boss.component(hit.componentId)!.kind == BossComponentKind.core,
       coreExposed: hit.weakPointBonus,
     );
     for (final destroyed

@@ -180,7 +180,9 @@ class _PartBar extends StatelessWidget {
                 : LinearProgressIndicator(
                     value: part.ratio,
                     minHeight: 4,
-                    color: const Color(0xFF7CFFB2),
+                    color: part.covered
+                        ? Colors.white38
+                        : const Color(0xFF7CFFB2),
                     backgroundColor: Colors.white24,
                   ),
           ),

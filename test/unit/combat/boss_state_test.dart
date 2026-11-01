@@ -13,6 +13,7 @@ void main() {
   const coreId = 'sentinel.core';
   const armorId = 'sentinel.armor';
   const cannonId = 'sentinel.cannon';
+  const wingIds = ['sentinel.hull_left', 'sentinel.hull_right'];
 
   var nextProjectile = 0;
   BossState newBoss() => BossState(definition: sentinel, arena: arena);
@@ -87,8 +88,17 @@ void main() {
   });
 
   group('core vulnerability window', () {
+    /// A Sentinel whose armor is gone, so the core can be hit directly.
+    BossState exposedCoreBoss() => newBoss()
+      ..applyHit(
+        componentId: armorId,
+        projectileId: nextProjectile++,
+        baseDamage: 100,
+        weaponType: WeaponType.blaster,
+      );
+
     test('core takes base damage while closed', () {
-      final boss = newBoss();
+      final boss = exposedCoreBoss();
       tick(boss, 1);
 
       final event = hit(boss, coreId, 10)!.whereType<BossComponentHit>().single;
@@ -99,7 +109,7 @@ void main() {
     });
 
     test('core takes the multiplier only while exposed', () {
-      final boss = newBoss();
+      final boss = exposedCoreBoss();
 
       final opening = tick(boss, 5.5).events;
       final exposedHit = hit(
@@ -140,8 +150,11 @@ void main() {
     void bringToThreshold(BossState boss) {
       hit(boss, cannonId, 100);
       hit(boss, armorId, 100);
-      // Total integrity: 600 max; 400 core left. 250 more reaches 150 (25%).
-      hit(boss, coreId, 249);
+      for (final wing in wingIds) {
+        hit(boss, wing, 70);
+      }
+      // Total integrity: 740 max; 400 core left. 215 more reaches 185 (25%).
+      hit(boss, coreId, 214);
     }
 
     test('is announced once when total integrity reaches 25%', () {
@@ -183,6 +196,36 @@ void main() {
       expect(events.whereType<BossDefeated>(), hasLength(1));
       expect(boss.phase, BossPhase.defeated);
       expect(tick(boss, 10).events, isEmpty);
+    });
+  });
+
+  group('covers', () {
+    test('the armor takes core hits until it is destroyed', () {
+      final boss = newBoss();
+
+      final absorbed = hit(boss, coreId, 30)!;
+      expect(boss.isCovered(coreId), isTrue);
+      expect(
+        absorbed.whereType<BossComponentHit>().single.componentId,
+        armorId,
+      );
+      expect(boss.component(coreId)!.integrity, 400);
+
+      hit(boss, armorId, 100);
+      final direct = hit(boss, coreId, 30)!;
+      expect(boss.isCovered(coreId), isFalse);
+      expect(direct.whereType<BossComponentHit>().single.componentId, coreId);
+    });
+
+    test('hull wings cover nothing and never change behavior', () {
+      final boss = newBoss();
+
+      for (final wing in wingIds) {
+        final events = hit(boss, wing, 70)!;
+        expect(events.whereType<BossComponentDestroyed>(), hasLength(1));
+        expect(events.whereType<BossBehaviorChanged>(), isEmpty);
+      }
+      expect(boss.isCovered(coreId), isTrue);
     });
   });
 

@@ -2,6 +2,9 @@ import '../rules/escape_rule.dart';
 import '../rules/vulnerability_window.dart';
 import 'boss_component_state.dart';
 
+/// Horizontal area of a boss, used to describe where the player focuses.
+enum BossZone { left, center, right }
+
 /// Static description of one boss part. Offsets and sizes are in arena units
 /// relative to the boss center; they define where the part can be hit.
 class BossComponentDefinition {
@@ -15,7 +18,11 @@ class BossComponentDefinition {
     required this.width,
     required this.height,
     this.dropItemId,
+    this.coveredBy = const [],
   });
+
+  /// Parts at most this far from the boss center belong to the center zone.
+  static const centerZoneHalfWidth = 20.0;
 
   final String id;
   final String name;
@@ -28,6 +35,16 @@ class BossComponentDefinition {
 
   /// Item left on the battlefield when this part is destroyed, if any.
   final String? dropItemId;
+
+  /// Outer parts protecting this one. While any of them stands, hits on this
+  /// part are absorbed by the first one still standing.
+  final List<String> coveredBy;
+
+  BossZone get zone => switch (offsetX) {
+    < -centerZoneHalfWidth => BossZone.left,
+    > centerZoneHalfWidth => BossZone.right,
+    _ => BossZone.center,
+  };
 }
 
 /// Single shots aimed at the ship, fired while the cannon is operational.

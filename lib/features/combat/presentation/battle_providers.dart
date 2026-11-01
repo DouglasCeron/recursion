@@ -62,11 +62,15 @@ class BossPartHud {
     required this.name,
     required this.integrity,
     required this.maxIntegrity,
+    this.covered = false,
   });
 
   final String name;
   final int integrity;
   final int maxIntegrity;
+
+  /// Still behind an outer part, so it cannot be damaged yet.
+  final bool covered;
 
   bool get isDestroyed => integrity == 0;
   double get ratio => integrity / maxIntegrity;
@@ -116,6 +120,7 @@ class BattleHudState {
             name: definition.name,
             integrity: boss.component(definition.id)!.integrity,
             maxIntegrity: definition.maxIntegrity,
+            covered: boss.isCovered(definition.id),
           ),
       ],
       bossPattern: boss.attackPattern,

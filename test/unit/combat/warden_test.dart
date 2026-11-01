@@ -10,34 +10,97 @@ void main() {
   const arena = ArenaBounds.standard;
   const warden = BossCatalog.warden;
   const coreId = 'warden.core';
+  const plateId = 'warden.plate';
   const leftId = 'warden.cannon_left';
+  const leftHousingId = 'warden.housing_left';
   const rightId = 'warden.cannon_right';
+  const rightHousingId = 'warden.housing_right';
 
   var nextProjectile = 0;
   BossState newWarden([BossModifiers modifiers = BossModifiers.none]) =>
       BossState(definition: warden, arena: arena, modifiers: modifiers);
+
+  List<BattleEvent> shoot(
+    BossState boss,
+    String id,
+    int damage, {
+    WeaponType type = WeaponType.blaster,
+  }) => boss.applyHit(
+    componentId: id,
+    projectileId: nextProjectile++,
+    baseDamage: damage,
+    weaponType: type,
+  )!;
 
   BossComponentHit hit(
     BossState boss,
     String id,
     int damage, {
     WeaponType type = WeaponType.blaster,
-  }) => boss
-      .applyHit(
-        componentId: id,
-        projectileId: nextProjectile++,
-        baseDamage: damage,
-        weaponType: type,
-      )!
-      .whereType<BossComponentHit>()
-      .single;
+  }) =>
+      shoot(boss, id, damage, type: type).whereType<BossComponentHit>().single;
+
+  /// Destroys [id] with one overwhelming shot, after breaking its covers.
+  List<BattleEvent> destroy(BossState boss, String id) {
+    for (final cover in warden.component(id).coveredBy) {
+      if (!boss.component(cover)!.isDestroyed) destroy(boss, cover);
+    }
+    return shoot(boss, id, 10000);
+  }
 
   BossUpdate tick(BossState boss, double dt) =>
       boss.update(dt, targetX: arena.width / 2, targetY: arena.height - 50);
 
+  group('covers', () {
+    test('a covered cannon passes hits to its housing', () {
+      final boss = newWarden();
+
+      final absorbed = hit(boss, leftId, 30);
+
+      expect(boss.isCovered(leftId), isTrue);
+      expect(absorbed.componentId, leftHousingId);
+      expect(boss.component(leftHousingId)!.integrity, 50);
+      expect(boss.component(leftId)!.integrity, 120);
+    });
+
+    test('destroying the housing exposes the cannon', () {
+      final boss = newWarden();
+
+      destroy(boss, leftHousingId);
+      final direct = hit(boss, leftId, 30);
+
+      expect(boss.isCovered(leftId), isFalse);
+      expect(direct.componentId, leftId);
+      expect(boss.component(leftId)!.integrity, 90);
+    });
+
+    test('the front plate takes core hits before the shield matters', () {
+      final boss = newWarden();
+
+      final absorbed = hit(boss, coreId, 40);
+
+      expect(absorbed.componentId, plateId);
+      expect(absorbed.blocked, isFalse);
+      expect(boss.component(plateId)!.integrity, 60);
+    });
+
+    test('a cover takes the hit even if the shot overkills it', () {
+      final boss = newWarden();
+
+      final events = shoot(boss, leftId, 500);
+
+      expect(
+        events.whereType<BossComponentDestroyed>().single.componentId,
+        leftHousingId,
+      );
+      expect(boss.component(leftId)!.integrity, 120);
+    });
+  });
+
   group('core shield', () {
     test('blocks all core damage while both cannons work', () {
       final boss = newWarden();
+      destroy(boss, plateId);
 
       final blocked = hit(boss, coreId, 50);
 
@@ -49,13 +112,9 @@ void main() {
 
     test('drops for 3s when a cannon is destroyed, then returns', () {
       final boss = newWarden();
+      destroy(boss, plateId);
 
-      final events = boss.applyHit(
-        componentId: leftId,
-        projectileId: nextProjectile++,
-        baseDamage: 1000,
-        weaponType: WeaponType.blaster,
-      )!;
+      final events = destroy(boss, leftId);
 
       expect(events.whereType<CoreShieldDropped>().single.duration, 3);
       expect(boss.isCoreShielded, isFalse);
@@ -69,14 +128,9 @@ void main() {
 
     test('stays down for good once both cannons are destroyed', () {
       final boss = newWarden();
-      hit(boss, leftId, 1000);
+      destroy(boss, leftId);
 
-      final events = boss.applyHit(
-        componentId: rightId,
-        projectileId: nextProjectile++,
-        baseDamage: 1000,
-        weaponType: WeaponType.blaster,
-      )!;
+      final events = destroy(boss, rightId);
 
       expect(events.whereType<CoreShieldDropped>().single.duration, isNull);
       expect(events.whereType<BossBehaviorChanged>(), hasLength(1));
@@ -113,8 +167,8 @@ void main() {
     test('reduce damage only for the countered weapon type', () {
       final boss = newWarden(plating);
 
-      final heavy = hit(boss, leftId, 50, type: WeaponType.heavyCannon);
-      final blaster = hit(boss, rightId, 50);
+      final heavy = hit(boss, leftHousingId, 50, type: WeaponType.heavyCannon);
+      final blaster = hit(boss, rightHousingId, 50);
 
       expect(heavy.damage, 30);
       expect(heavy.resisted, isTrue);
@@ -124,11 +178,13 @@ void main() {
 
     test('an exposed core always takes full doubled damage', () {
       final boss = newWarden(plating);
-      hit(boss, leftId, 1000);
-      hit(boss, rightId, 1000);
-      while (!boss.isCoreVulnerable) {
+      destroy(boss, plateId);
+      destroy(boss, leftId);
+      destroy(boss, rightId);
+      for (var i = 0; i < 400 && !boss.isCoreVulnerable; i++) {
         tick(boss, 0.05);
       }
+      expect(boss.isCoreVulnerable, isTrue);
 
       final exposed = hit(boss, coreId, 10, type: WeaponType.heavyCannon);
 
@@ -138,8 +194,9 @@ void main() {
 
     test('a closed core still resists the countered weapon', () {
       final boss = newWarden(plating);
-      hit(boss, leftId, 1000);
-      hit(boss, rightId, 1000);
+      destroy(boss, plateId);
+      destroy(boss, leftId);
+      destroy(boss, rightId);
 
       final closed = hit(boss, coreId, 10, type: WeaponType.heavyCannon);
 
@@ -156,5 +213,11 @@ void main() {
       expect(adapted.coreWindow.isOpenAt(5.5), isFalse);
       expect(adapted.coreWindow.isOpenAt(6.5), isTrue);
     });
+  });
+
+  test('parts know their zone from their position', () {
+    expect(warden.component(leftId).zone.name, 'left');
+    expect(warden.component(plateId).zone.name, 'center');
+    expect(warden.component(rightHousingId).zone.name, 'right');
   });
 }

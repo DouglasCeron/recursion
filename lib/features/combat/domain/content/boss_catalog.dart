@@ -5,9 +5,9 @@ import '../rules/vulnerability_window.dart';
 
 /// Static boss content available in the prototype.
 abstract final class BossCatalog {
-  /// First boss. The armor plate shields the core from below, and the cannon
-  /// sits under the armor, so players naturally break through the front parts
-  /// before reaching the core.
+  /// First boss. The armor plate covers the core, and the cannon sits in
+  /// front of the armor, so players break through the front parts before
+  /// reaching the core. Two hull wings flank the armor and only soak shots.
   static const sentinel = BossDefinition(
     id: 'boss.sentinel',
     name: 'Sentinel',
@@ -21,6 +21,7 @@ abstract final class BossCatalog {
         offsetY: -6,
         width: 44,
         height: 44,
+        coveredBy: ['sentinel.armor'],
       ),
       BossComponentDefinition(
         id: 'sentinel.armor',
@@ -31,6 +32,26 @@ abstract final class BossCatalog {
         offsetY: 26,
         width: 120,
         height: 16,
+      ),
+      BossComponentDefinition(
+        id: 'sentinel.hull_left',
+        name: 'Left wing',
+        kind: BossComponentKind.hull,
+        maxIntegrity: 70,
+        offsetX: -76,
+        offsetY: 22,
+        width: 28,
+        height: 24,
+      ),
+      BossComponentDefinition(
+        id: 'sentinel.hull_right',
+        name: 'Right wing',
+        kind: BossComponentKind.hull,
+        maxIntegrity: 70,
+        offsetX: 76,
+        offsetY: 22,
+        width: 28,
+        height: 24,
       ),
       BossComponentDefinition(
         id: 'sentinel.cannon',
@@ -63,8 +84,9 @@ abstract final class BossCatalog {
   );
 
   /// Second boss. Two side cannons fire in turns and power a shield around
-  /// the core; breaking a cannon opens the shield briefly. This is the boss
-  /// that receives countermeasures from enemy intel.
+  /// the core; breaking a cannon opens the shield briefly. Each cannon sits
+  /// behind a hull housing and the core behind a front plate. This boss
+  /// receives countermeasures from enemy intel.
   static const warden = BossDefinition(
     id: 'boss.warden',
     name: 'Warden',
@@ -78,6 +100,17 @@ abstract final class BossCatalog {
         offsetY: -4,
         width: 48,
         height: 48,
+        coveredBy: ['warden.plate'],
+      ),
+      BossComponentDefinition(
+        id: 'warden.plate',
+        name: 'Front plate',
+        kind: BossComponentKind.armor,
+        maxIntegrity: 100,
+        offsetX: 0,
+        offsetY: 30,
+        width: 64,
+        height: 12,
       ),
       BossComponentDefinition(
         id: 'warden.cannon_left',
@@ -88,6 +121,17 @@ abstract final class BossCatalog {
         offsetY: 18,
         width: 22,
         height: 34,
+        coveredBy: ['warden.housing_left'],
+      ),
+      BossComponentDefinition(
+        id: 'warden.housing_left',
+        name: 'Left housing',
+        kind: BossComponentKind.hull,
+        maxIntegrity: 80,
+        offsetX: -62,
+        offsetY: 42,
+        width: 34,
+        height: 12,
       ),
       BossComponentDefinition(
         id: 'warden.cannon_right',
@@ -98,6 +142,17 @@ abstract final class BossCatalog {
         offsetY: 18,
         width: 22,
         height: 34,
+        coveredBy: ['warden.housing_right'],
+      ),
+      BossComponentDefinition(
+        id: 'warden.housing_right',
+        name: 'Right housing',
+        kind: BossComponentKind.hull,
+        maxIntegrity: 80,
+        offsetX: 62,
+        offsetY: 42,
+        width: 34,
+        height: 12,
       ),
     ],
     coreWindow: VulnerabilityWindow(period: 8, openDuration: 3),

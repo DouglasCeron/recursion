@@ -108,6 +108,28 @@ class BossState {
   bool get isCoreVulnerable =>
       isActive && !isCoreShielded && coreWindow.isOpenAt(_time);
 
+  /// Whether an outer part still protects [id].
+  bool isCovered(String id) => _standingCover(id) != null;
+
+  String? _standingCover(String id) {
+    for (final cover in definition.component(id).coveredBy) {
+      if (!_components[cover]!.isDestroyed) return cover;
+    }
+    return null;
+  }
+
+  /// The part that actually takes a hit aimed at [id]: the outermost layer
+  /// still standing in front of it, or [id] itself once it is exposed.
+  String _absorbingPart(String id) {
+    var target = id;
+    for (var depth = 0; depth < definition.components.length; depth++) {
+      final cover = _standingCover(target);
+      if (cover == null) return target;
+      target = cover;
+    }
+    throw StateError('cover cycle around $id');
+  }
+
   /// Current arena position of a part's center.
   (double, double) componentPosition(String id) {
     final part = definition.component(id);
@@ -180,7 +202,9 @@ class BossState {
   ///
   /// Returns `null` when the hit is not accepted (unknown or destroyed part,
   /// boss no longer active), so the caller can keep the projectile alive.
-  /// A shielded core accepts the hit but takes no damage.
+  /// A hit on a covered part is taken by its outermost standing cover, and
+  /// the events name that cover. A shielded core accepts the hit but takes
+  /// no damage.
   List<BattleEvent>? applyHit({
     required String componentId,
     required int projectileId,
@@ -188,8 +212,10 @@ class BossState {
     required WeaponType weaponType,
   }) {
     if (!isActive) return null;
-    final component = _components[componentId];
-    if (component == null || component.isDestroyed) return null;
+    final reported = _components[componentId];
+    if (reported == null || reported.isDestroyed) return null;
+    componentId = _absorbingPart(componentId);
+    final component = _components[componentId]!;
 
     final isCore = component.kind == BossComponentKind.core;
     if (isCore && isCoreShielded) {
@@ -240,7 +266,7 @@ class BossState {
           return events;
         case BossComponentKind.cannon:
           events.addAll(_onCannonDestroyed());
-        case BossComponentKind.armor:
+        case BossComponentKind.armor || BossComponentKind.hull:
           break;
       }
     }

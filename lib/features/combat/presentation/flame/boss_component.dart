@@ -87,6 +87,13 @@ class BossPartComponent extends PositionComponent {
          position: Vector2(definition.offsetX, definition.offsetY),
          size: Vector2(definition.width, definition.height),
          anchor: Anchor.center,
+         // Outer layers are drawn over the parts they cover.
+         priority: switch (definition.kind) {
+           BossComponentKind.core => 0,
+           BossComponentKind.cannon => 1,
+           BossComponentKind.armor => 2,
+           BossComponentKind.hull => 3,
+         },
        );
 
   final BossState boss;
@@ -99,6 +106,12 @@ class BossPartComponent extends PositionComponent {
   static final _destroyedPaint = Paint()..color = const Color(0xFF3A3F4B);
   static final _cannonPaint = Paint()..color = const Color(0xFFB0B7C6);
   static final _armorPaint = Paint()..color = const Color(0xFF8C5A3C);
+  static final _hullPaint = Paint()..color = const Color(0xFF56627A);
+  static final _hullSeamPaint = Paint()
+    ..color = const Color(0xFF3A4458)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
+  static final _coveredShadePaint = Paint()..color = const Color(0x99000000);
   static final _coreClosedPaint = Paint()..color = const Color(0xFF7A1E2C);
   static final _coreOpenPaint = Paint()..color = const Color(0xFFFF4D6D);
   static final _coreGlowPaint = Paint()
@@ -157,8 +170,22 @@ class BossPartComponent extends PositionComponent {
           RRect.fromRectAndRadius(rect, const Radius.circular(4)),
           _armorPaint,
         );
+      case BossComponentKind.hull:
+        final hull = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+        canvas.drawRRect(hull, _hullPaint);
+        canvas.drawRRect(hull.deflate(3), _hullSeamPaint);
       case BossComponentKind.cannon:
         canvas.drawRect(rect, _cannonPaint);
+    }
+    if (boss.isCovered(definition.id)) {
+      final shade = rect.inflate(1);
+      definition.kind == BossComponentKind.core
+          ? canvas.drawCircle(
+              shade.center,
+              shade.shortestSide / 2,
+              _coveredShadePaint,
+            )
+          : canvas.drawRect(shade, _coveredShadePaint);
     }
     if (boss.modifiers.damageMultipliers.isNotEmpty &&
         definition.kind != BossComponentKind.core) {

@@ -23,7 +23,7 @@ After the proof of concept:
 | Step | Scope | Status |
 |---|---|---|
 | 7 | Campaign map, reset progress, save schema v2 (defeated bosses) | Done |
-| 8 | Layered boss structures that cover inner parts | Pending |
+| 8 | Layered boss structures that cover inner parts | Done |
 | 9 | Player focus by zone; the next boss reinforces the focused zone | Pending |
 | 10 | Battle HUD that scales with many boss parts | Pending |
 | 11 | Missile and Laser content | Pending |
@@ -105,8 +105,9 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
 
 | Part | Integrity | Rule |
 |---|---|---|
-| Core | 400 | Destroying it defeats the boss. Takes ×2 damage while exposed. |
-| Armor | 100 | Wide plate under the core; shields it from shots coming from below. |
+| Core | 400 | Covered by the armor. Destroying it defeats the boss. Takes ×2 damage while exposed. |
+| Armor | 100 | Wide plate under the core. |
+| Left / right wing | 70 each | Hull flanking the armor; they cover nothing and only soak shots. |
 | Cannon | 100 | Fires aimed shots. Destroying it changes the boss's behavior. |
 
 - **Attacks:** first attack after 1.5 s. With the cannon: one aimed shot every
@@ -115,8 +116,8 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
 - **Core vulnerability window:** 8 s cycles, closed for 5 s then exposed for
   3 s (first exposure at 5 s). Only core hits during the window get the ×2
   bonus; outside it the core takes normal damage.
-- **Escape:** when the boss's total integrity (sum of all parts, 600 max)
-  drops to 25% (150) or below, it announces the escape (HUD countdown and
+- **Escape:** when the boss's total integrity (sum of all parts, 740 max)
+  drops to 25% (185) or below, it announces the escape (HUD countdown and
   flashing parts) and leaves 5 s later unless the core is destroyed first.
   The escape is announced at most once.
 - **Ship:** 100 hull. After taking damage it is invulnerable for 0.75 s.
@@ -124,6 +125,21 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
 
 Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 `bossEscaped`.
+
+## Layered structures
+
+- A part can be covered by outer parts (`coveredBy`). While any cover
+  stands, a hit on the inner part is taken by the outermost cover still
+  standing, so the damage and the hit event go to that cover. Once the
+  covers are gone, the inner part takes hits normally.
+- This rule lives in the domain, so it does not depend on which hitbox Flame
+  reports first.
+- Covered parts are drawn darker and their HUD bar is grey. Outer layers are
+  drawn on top of what they cover.
+- Hull (`BossComponentKind.hull`) is plain outer plating: it protects, never
+  attacks and never drops anything.
+- Every part belongs to a zone by its horizontal offset from the boss
+  center: left, center (within 20 units) or right.
 
 ## Drops, inventory and loadout
 
@@ -175,8 +191,13 @@ its outcome. It opens a briefing screen first.
 
 | Part | Integrity | Rule |
 |---|---|---|
-| Core | 360 | Destroying it defeats the boss. Shielded while any cannon works. |
-| Left / right cannon | 120 each | Fire aimed shots in turns (0.9 s, 12 damage). |
+| Core | 360 | Covered by the front plate. Destroying it defeats the boss. Shielded while any cannon works. |
+| Front plate | 100 | Armor in front of the core. |
+| Left / right cannon | 120 each | Covered by their housing. Fire aimed shots in turns (0.9 s, 12 damage). |
+| Left / right housing | 80 each | Hull in front of each cannon. |
+
+Natural order: housing → cannon (the shield drops) → front plate → core.
+Total integrity is 860, so the escape is announced at 215.
 
 - **Shield:** blocks all core damage. Destroying a cannon drops it for
   **3 s**; destroying both drops it for good and switches the attack to a
@@ -234,8 +255,11 @@ fought and defeated, last battle record) survive an app restart.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.
-- The battle HUD is tight with three boss part bars and can overlap the top
-  of the Warden.
+- The battle HUD lists one bar per boss part and covers the top of the
+  bosses now that they have five or six parts (step 10).
+- Balance: the escape threshold counts every part, and the core is the last
+  one standing. Against an adapted Warden, a Blaster-only build usually
+  cannot finish the core before it escapes.
 
 ## Tests
 
