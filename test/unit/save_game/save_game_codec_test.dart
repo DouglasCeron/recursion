@@ -88,7 +88,10 @@ void main() {
   });
 
   test('the document carries the schema version', () {
-    expect(documentOf(sampleGame())['schemaVersion'], 1);
+    expect(
+      documentOf(sampleGame())['schemaVersion'],
+      SaveGameCodec.currentVersion,
+    );
   });
 
   test('nothing stored means a fresh game', () {
@@ -149,13 +152,60 @@ void main() {
     expect(game.progress.foughtBossIds, isEmpty);
   });
 
+  test('defeated bosses survive a round trip', () {
+    final game = codec.decode(codec.encode(sampleGame())).game;
+
+    expect(game.progress.defeatedBossIds, {BossCatalog.sentinel.id});
+  });
+
   group('migrations', () {
-    test('upgrade older documents step by step', () {
-      final v1 = codec.encode(SaveGame.initial());
-      final v2Codec = SaveGameCodec(
-        version: 2,
+    /// The v1 document the previous release would have written for [game].
+    String v1Of(SaveGame game) {
+      final document = documentOf(game);
+      (document['progress'] as Map).remove('defeatedBossIds');
+      return jsonEncode({...document, 'schemaVersion': 1});
+    }
+
+    test('v1 saves load, counting a last-battle victory as defeated', () {
+      final result = codec.decode(v1Of(sampleGame()));
+
+      expect(result.status, SaveLoadStatus.loaded);
+      expect(result.game.progress.defeatedBossIds, {BossCatalog.sentinel.id});
+      expect(result.game.progress.battlesFought, 1);
+      expect(result.game.loadout.weaponId, WeaponCatalog.heavyCannon.id);
+    });
+
+    test('v1 saves without a victory have no defeated bosses', () {
+      final lost = SaveGame(
+        inventory: Inventory.starter(),
+        loadout: Loadout.starter(),
+        intel: const BossIntel(),
+        progress: const PlayerProgress().recordBattle(
+          BattleRecord(
+            bossId: BossCatalog.sentinel.id,
+            outcome: BattleOutcome.defeat,
+            duration: 10,
+            stats: CombatStats.empty,
+            destroyedComponentIds: const [],
+            collectedItemIds: const [],
+            observerDestroyed: true,
+            intelTransmitted: false,
+          ),
+        ),
+      );
+
+      final progress = codec.decode(v1Of(lost)).game.progress;
+
+      expect(progress.defeatedBossIds, isEmpty);
+      expect(progress.isBossUnlocked(BossCatalog.warden.id), isTrue);
+    });
+
+    test('migrations run in sequence up to the current version', () {
+      final v3Codec = SaveGameCodec(
+        version: 3,
         migrations: {
-          1: (document) => {
+          ...SaveGameCodec.defaultMigrations,
+          2: (document) => {
             ...document,
             'inventory': {
               'itemIds': [WeaponCatalog.heavyCannon.id],
@@ -164,7 +214,7 @@ void main() {
         },
       );
 
-      final result = v2Codec.decode(v1);
+      final result = v3Codec.decode(v1Of(SaveGame.initial()));
 
       expect(result.status, SaveLoadStatus.loaded);
       expect(
@@ -174,9 +224,9 @@ void main() {
     });
 
     test('a missing migration marks the save as unreadable', () {
-      final v1 = codec.encode(SaveGame.initial());
+      final current = codec.encode(SaveGame.initial());
 
-      final result = const SaveGameCodec(version: 2).decode(v1);
+      final result = const SaveGameCodec(version: 3).decode(current);
 
       expect(result.status, SaveLoadStatus.corrupted);
     });

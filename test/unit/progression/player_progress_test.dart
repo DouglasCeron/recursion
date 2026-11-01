@@ -37,6 +37,27 @@ void main() {
     }
   });
 
+  test('the campaign follows the boss catalog order', () {
+    expect(CampaignRules.order, [sentinel, warden]);
+    expect(CampaignRules.requirementFor(sentinel), isNull);
+    expect(CampaignRules.requirementFor(warden), sentinel);
+  });
+
+  test('only a victory marks a boss as defeated', () {
+    final lost = const PlayerProgress()
+        .recordBattle(recordFor(sentinel, BattleOutcome.defeat))
+        .recordBattle(recordFor(sentinel, BattleOutcome.bossEscaped));
+    expect(lost.isBossDefeated(sentinel), isFalse);
+
+    final won = lost.recordBattle(recordFor(sentinel, BattleOutcome.victory));
+    expect(won.isBossDefeated(sentinel), isTrue);
+
+    final lostAgain = won.recordBattle(
+      recordFor(sentinel, BattleOutcome.defeat),
+    );
+    expect(lostAgain.isBossDefeated(sentinel), isTrue);
+  });
+
   test('records count and the last battle', () {
     final record = recordFor(warden, BattleOutcome.victory);
 

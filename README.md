@@ -18,6 +18,16 @@ The proof of concept is built in stages:
 | 5 | Second, adaptive boss driven by transmitted intel | Done |
 | 6 | Local persistence (versioned JSON), validation and docs | Done |
 
+After the proof of concept:
+
+| Step | Scope | Status |
+|---|---|---|
+| 7 | Campaign map, reset progress, save schema v2 (defeated bosses) | Done |
+| 8 | Layered boss structures that cover inner parts | Pending |
+| 9 | Player focus by zone; the next boss reinforces the focused zone | Pending |
+| 10 | Battle HUD that scales with many boss parts | Pending |
+| 11 | Missile and Laser content | Pending |
+
 ## Requirements
 
 - Flutter 3.44 (Dart 3.12) or newer on the stable channel.
@@ -28,6 +38,7 @@ The proof of concept is built in stages:
 ```sh
 flutter pub get
 flutter run                    # opens the main menu
+flutter run --route /campaign  # opens the campaign map
 flutter run --route /battle    # jumps straight into the Sentinel battle
 flutter run --route "/battle?boss=boss.warden"    # straight into the Warden
 flutter run --route "/briefing?boss=boss.warden"  # the Warden briefing
@@ -36,10 +47,22 @@ flutter run --route "/briefing?boss=boss.warden"  # the Warden briefing
 Controls: drag anywhere on the screen to move the ship; weapons fire
 automatically.
 
-Suggested first session: fight the Sentinel (destroy its cannon and touch
-the falling Heavy Cannon to collect it), equip it in Inventory, then fight
-the Warden and read its briefing. Destroy the observer drone on the left edge
-if you do not want the enemy to learn from that battle.
+Suggested first session: open Campaign and fight the Sentinel (destroy its
+cannon and touch the falling Heavy Cannon to collect it), equip it in
+Inventory, then pick the Warden on the map and read its briefing. Destroy the
+observer drone on the left edge if you do not want the enemy to learn from
+that battle.
+
+## Campaign
+
+- The main menu has Campaign, Inventory and Reset progress (asks for
+  confirmation, then erases items, progress and enemy intel).
+- The campaign map shows every boss as a numbered point on one path, in
+  `BossCatalog.all` order, joined by lines. Each point is locked,
+  available, fought (not defeated yet) or defeated (check mark).
+- A boss unlocks once the previous one has been fought, whatever the
+  outcome; the line to it lights up. Defeated bosses can be replayed.
+- Adaptive bosses open their briefing first; others go straight to battle.
 
 ## Checks and builds
 
@@ -147,8 +170,8 @@ Rules:
 
 ## Second boss: Warden (adaptive)
 
-Unlocked after the first Sentinel battle, whatever its outcome. The menu has
-one button per boss; the Warden opens a briefing screen first.
+Point 2 of the campaign, unlocked after the first Sentinel battle, whatever
+its outcome. It opens a briefing screen first.
 
 | Part | Integrity | Rule |
 |---|---|---|
@@ -184,9 +207,9 @@ the inventory):
 ## Saving
 
 Inventory, equipped weapon, enemy intel and progress (battles fought, bosses
-fought, last battle record) survive an app restart.
+fought and defeated, last battle record) survive an app restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 1) in
+- Stored as one JSON document with a `schemaVersion` (currently 2) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -197,8 +220,10 @@ fought, last battle record) survive an app restart.
   newer schema version, starts a new game and is replaced on the next write.
   Unknown item, boss or weapon ids are dropped, and an equipped weapon that
   is no longer owned falls back to the Blaster.
-- Schema changes go through `SaveGameCodec.migrations`, one step per version
-  (`migrations[1]` upgrades a v1 document to v2).
+- Schema changes go through `SaveGameCodec.migrations`, one step per version.
+  `migrations[1]` upgrades v1 to v2 by adding the defeated bosses: v1 only
+  knew the last battle, so its boss counts as defeated if that battle was a
+  victory.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
@@ -206,10 +231,9 @@ fought, last battle record) survive an app restart.
 
 - Prototype content only: two bosses and two weapons (Missile and Laser
   types exist in the domain but have no content yet).
-- Only one save slot and no way to reset it from the app; uninstalling the
-  app (or clearing its data) starts over.
+- Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
-  battle flow, the providers and the home screen, not what is drawn.
+  battle flow, the providers and the menu and map screens, not what is drawn.
 - The battle HUD is tight with three boss part bars and can overlap the top
   of the Warden.
 
@@ -225,4 +249,5 @@ fought, last battle record) survive an app restart.
   transmissions reaching (or not reaching) the enemy intel, different weapon
   usage producing different Warden setups, and an app restart restoring the
   save, all through Riverpod without rendering.
-- `test/widget/` — home screen smoke test (boss buttons and lock).
+- `test/widget/` — main menu, campaign map states and navigation, and the
+  reset confirmation.

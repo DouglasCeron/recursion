@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/boss_evolution/application/boss_intel_controller.dart';
-import '../features/boss_evolution/domain/boss_evolution.dart';
 import '../features/boss_evolution/domain/boss_intel.dart';
-import '../features/combat/domain/content/boss_catalog.dart';
 import '../features/inventory/application/inventory_controller.dart';
-import '../features/progression/application/progress_controller.dart';
+import '../features/save_game/application/save_game_providers.dart';
 import 'router.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -16,7 +14,6 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final weapon = ref.watch(inventoryControllerProvider).equippedWeapon;
-    final progress = ref.watch(progressControllerProvider);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -30,24 +27,12 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               Text('Prototype', style: textTheme.bodyMedium),
               const SizedBox(height: 40),
-              for (final boss in BossCatalog.all) ...[
-                FilledButton(
-                  onPressed: progress.isBossUnlocked(boss.id)
-                      ? () => Navigator.of(context).pushNamed(
-                          AdaptationRules.adaptiveBossIds.contains(boss.id)
-                              ? AppRoutes.briefing
-                              : AppRoutes.battle,
-                          arguments: boss.id,
-                        )
-                      : null,
-                  child: Text(
-                    progress.isBossUnlocked(boss.id)
-                        ? 'Fight ${boss.name}'
-                        : '${boss.name} — fight the Sentinel first',
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+              FilledButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.campaign),
+                child: const Text('Campaign'),
+              ),
+              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () =>
                     Navigator.of(context).pushNamed(AppRoutes.inventory),
@@ -66,11 +51,43 @@ class HomeScreen extends ConsumerWidget {
                   color: const Color(0xFFB39DDB),
                 ),
               ),
+              const SizedBox(height: 32),
+              TextButton(
+                onPressed: () => _confirmReset(context, ref),
+                child: const Text(
+                  'Reset progress',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  static Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset progress?'),
+        content: const Text(
+          'Your items, campaign progress and everything the enemy learned '
+          'about you will be erased.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) ref.read(resetGameProvider)();
   }
 
   static String _intelSummary(BossIntel intel) {

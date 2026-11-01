@@ -26,4 +26,6 @@ class BossIntelController extends Notifier<BossIntel> {
   void receiveTransmission(CombatStats observed) {
     state = state.withReport(WeaponExposureProfile.fromStats(observed));
   }
+
+  void reset() => state = const BossIntel();
 }

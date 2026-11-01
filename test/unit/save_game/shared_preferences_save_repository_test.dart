@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/inventory/domain/inventory.dart';
 import 'package:recursion/features/save_game/domain/save_game.dart';
+import 'package:recursion/features/save_game/infrastructure/save_game_codec.dart';
 import 'package:recursion/features/save_game/infrastructure/shared_preferences_save_repository.dart';
 import 'package:recursion/features/ship/domain/weapon_catalog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +27,7 @@ void main() {
 
     expect(
       preferences.getString(SharedPreferencesSaveRepository.storageKey),
-      contains('"schemaVersion":1'),
+      contains('"schemaVersion":${SaveGameCodec.currentVersion}'),
     );
     final loaded = await repository.load();
     expect(loaded.status, SaveLoadStatus.loaded);

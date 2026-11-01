@@ -277,7 +277,7 @@ class _BattleResult extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(onPressed: onRestart, child: const Text('Retry')),
-                TextButton(onPressed: onExit, child: const Text('Main menu')),
+                TextButton(onPressed: onExit, child: const Text('Leave')),
               ],
             ),
           ),

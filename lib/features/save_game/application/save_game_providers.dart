@@ -36,6 +36,16 @@ final autosaveProvider = Provider<Autosave>((ref) {
   return autosave;
 });
 
+/// Wipes inventory, intel and progress back to a new game. Autosave then
+/// replaces the stored save.
+final resetGameProvider = Provider<void Function()>(
+  (ref) => () {
+    ref.read(inventoryControllerProvider.notifier).reset();
+    ref.read(bossIntelControllerProvider.notifier).reset();
+    ref.read(progressControllerProvider.notifier).reset();
+  },
+);
+
 /// Overrides that make every persisted feature start from [game].
 List<Override> restoreOverrides(SaveGame game) => [
   initialInventoryStateProvider.overrideWithValue(

@@ -27,11 +27,29 @@ class SaveGameCodec {
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 1;
+  static const currentVersion = 2;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
-  static const defaultMigrations = <int, SaveMigration>{};
+  static const defaultMigrations = <int, SaveMigration>{1: _addDefeatedBosses};
+
+  /// v2 tracks defeated bosses. A v1 save only knows its last battle, so
+  /// that boss counts as defeated if that battle was a victory.
+  static JsonMap _addDefeatedBosses(JsonMap document) {
+    final progress = document['progress'] as JsonMap;
+    final lastBattle = progress['lastBattle'] as JsonMap?;
+    return {
+      ...document,
+      'progress': {
+        ...progress,
+        'defeatedBossIds': [
+          if (lastBattle != null &&
+              lastBattle['outcome'] == BattleOutcome.victory.name)
+            lastBattle['bossId'],
+        ],
+      },
+    };
+  }
 
   final int version;
   final Map<int, SaveMigration> migrations;
@@ -90,6 +108,7 @@ class SaveGameCodec {
   static JsonMap _encodeProgress(PlayerProgress progress) => {
     'battlesFought': progress.battlesFought,
     'foughtBossIds': progress.foughtBossIds.toList()..sort(),
+    'defeatedBossIds': progress.defeatedBossIds.toList()..sort(),
     'lastBattle': switch (progress.lastBattle) {
       null => null,
       final record => _encodeRecord(record),
@@ -177,10 +196,8 @@ class SaveGameCodec {
     final lastBattle = json['lastBattle'] as JsonMap?;
     return PlayerProgress(
       battlesFought: json['battlesFought'] as int,
-      foughtBossIds: Set.unmodifiable({
-        for (final id in _strings(json['foughtBossIds']))
-          if (BossCatalog.byId(id) != null) id,
-      }),
+      foughtBossIds: _knownBossIds(json['foughtBossIds']),
+      defeatedBossIds: _knownBossIds(json['defeatedBossIds']),
       lastBattle: lastBattle == null ? null : _decodeRecord(lastBattle),
     );
   }
@@ -215,6 +232,11 @@ class SaveGameCodec {
   }
 
   static List<String> _strings(Object? json) => (json as List).cast<String>();
+
+  static Set<String> _knownBossIds(Object? json) => Set.unmodifiable({
+    for (final id in _strings(json))
+      if (BossCatalog.byId(id) != null) id,
+  });
 
   static WeaponType? _weaponType(Object? name) =>
       _enum(WeaponType.values, name);

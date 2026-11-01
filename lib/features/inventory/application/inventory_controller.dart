@@ -57,4 +57,6 @@ class InventoryController extends Notifier<PlayerInventoryState> {
     state = PlayerInventoryState(inventory: state.inventory, loadout: loadout);
     return true;
   }
+
+  void reset() => state = PlayerInventoryState.starter();
 }

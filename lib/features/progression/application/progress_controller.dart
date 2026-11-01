@@ -20,4 +20,6 @@ class ProgressController extends Notifier<PlayerProgress> {
   void recordBattle(BattleRecord record) {
     state = state.recordBattle(record);
   }
+
+  void reset() => state = const PlayerProgress();
 }
