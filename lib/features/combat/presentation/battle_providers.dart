@@ -57,25 +57,6 @@ final battleSessionProvider = Provider.autoDispose
       return session;
     });
 
-class BossPartHud {
-  const BossPartHud({
-    required this.name,
-    required this.integrity,
-    required this.maxIntegrity,
-    this.covered = false,
-  });
-
-  final String name;
-  final int integrity;
-  final int maxIntegrity;
-
-  /// Still behind an outer part, so it cannot be damaged yet.
-  final bool covered;
-
-  bool get isDestroyed => integrity == 0;
-  double get ratio => integrity / maxIntegrity;
-}
-
 /// Snapshot of the battle shown by the Flutter HUD. Refreshed on battle
 /// events rather than every frame.
 class BattleHudState {
@@ -86,15 +67,14 @@ class BattleHudState {
     required this.hull,
     required this.maxHull,
     required this.bossName,
-    required this.bossParts,
+    required this.bossIntegrity,
+    required this.bossMaxIntegrity,
     required this.bossPattern,
     required this.coreVulnerable,
     required this.escapeTimeLeft,
     required this.availableDrop,
     required this.collectedItems,
     required this.lostItems,
-    required this.observerIntegrity,
-    required this.observerMaxIntegrity,
     required this.intelTransmitted,
     required this.hasCoreShield,
     required this.coreShielded,
@@ -114,15 +94,8 @@ class BattleHudState {
       hull: battle.ship.hull,
       maxHull: battle.ship.maxHull,
       bossName: boss.definition.name,
-      bossParts: [
-        for (final definition in boss.definition.components)
-          BossPartHud(
-            name: definition.name,
-            integrity: boss.component(definition.id)!.integrity,
-            maxIntegrity: definition.maxIntegrity,
-            covered: boss.isCovered(definition.id),
-          ),
-      ],
+      bossIntegrity: boss.totalIntegrity,
+      bossMaxIntegrity: boss.totalMaxIntegrity,
       bossPattern: boss.attackPattern,
       coreVulnerable: boss.isCoreVulnerable,
       escapeTimeLeft: boss.phase == BossPhase.escaping
@@ -139,8 +112,6 @@ class BattleHudState {
         for (final drop in battle.drops)
           if (drop.status == DropStatus.expired) _itemName(drop.itemId),
       ],
-      observerIntegrity: battle.observer.integrity,
-      observerMaxIntegrity: battle.observer.maxIntegrity,
       intelTransmitted: battle.intelTransmitted,
       hasCoreShield: boss.definition.hasCoreShield,
       coreShielded: boss.isCoreShielded,
@@ -159,7 +130,11 @@ class BattleHudState {
   final int hull;
   final int maxHull;
   final String bossName;
-  final List<BossPartHud> bossParts;
+
+  /// Sum of every part, shown as one bar; each part has its own bar in the
+  /// arena.
+  final int bossIntegrity;
+  final int bossMaxIntegrity;
   final BossAttackPattern bossPattern;
   final bool coreVulnerable;
 
@@ -170,8 +145,6 @@ class BattleHudState {
   final ({String name, double timeLeft})? availableDrop;
   final List<String> collectedItems;
   final List<String> lostItems;
-  final int observerIntegrity;
-  final int observerMaxIntegrity;
   final bool intelTransmitted;
   final bool hasCoreShield;
   final bool coreShielded;
@@ -183,7 +156,7 @@ class BattleHudState {
   final bool coreWindowShortened;
 
   double get hullRatio => hull / maxHull;
-  bool get observerDestroyed => observerIntegrity == 0;
+  double get bossIntegrityRatio => bossIntegrity / bossMaxIntegrity;
 
   static String _itemName(String itemId) =>
       WeaponCatalog.byId(itemId)?.name ?? itemId;

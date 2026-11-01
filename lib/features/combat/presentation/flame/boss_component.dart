@@ -112,6 +112,13 @@ class BossPartComponent extends PositionComponent {
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5;
   static final _coveredShadePaint = Paint()..color = const Color(0x99000000);
+  static final _barBackPaint = Paint()..color = const Color(0x88000000);
+  static final _barPaint = Paint()..color = const Color(0xFF7CFFB2);
+  static final _coveredBarPaint = Paint()..color = const Color(0x99FFFFFF);
+
+  static const _barHeight = 3.0;
+  static const _barGap = 3.0;
+  static const _minBarWidth = 24.0;
   static final _coreClosedPaint = Paint()..color = const Color(0xFF7A1E2C);
   static final _coreOpenPaint = Paint()..color = const Color(0xFFFF4D6D);
   static final _coreGlowPaint = Paint()
@@ -187,6 +194,7 @@ class BossPartComponent extends PositionComponent {
             )
           : canvas.drawRect(shade, _coveredShadePaint);
     }
+    _renderIntegrityBar(canvas, rect);
     if (boss.modifiers.damageMultipliers.isNotEmpty &&
         definition.kind != BossComponentKind.core) {
       canvas.drawRect(rect.inflate(2), _adaptedPaint);
@@ -194,5 +202,25 @@ class BossPartComponent extends PositionComponent {
     if (boss.phase == BossPhase.escaping && (boss.escapeTimeLeft * 4) % 2 < 1) {
       canvas.drawRect(rect, _escapeTintPaint);
     }
+  }
+
+  /// A thin integrity bar just above the part; grey while it is covered.
+  void _renderIntegrityBar(Canvas canvas, Rect rect) {
+    final width = rect.width < _minBarWidth ? _minBarWidth : rect.width;
+    final back = Rect.fromCenter(
+      center: Offset(rect.center.dx, rect.top - _barGap - _barHeight / 2),
+      width: width,
+      height: _barHeight,
+    );
+    canvas.drawRect(back, _barBackPaint);
+    canvas.drawRect(
+      Rect.fromLTWH(
+        back.left,
+        back.top,
+        back.width * state.integrity / state.maxIntegrity,
+        back.height,
+      ),
+      boss.isCovered(definition.id) ? _coveredBarPaint : _barPaint,
+    );
   }
 }

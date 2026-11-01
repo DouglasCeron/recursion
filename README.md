@@ -25,7 +25,7 @@ After the proof of concept:
 | 7 | Campaign map, reset progress, save schema v2 (defeated bosses) | Done |
 | 8 | Layered boss structures that cover inner parts | Done |
 | 9 | Player focus by zone; the next boss reinforces the focused zone | Pending |
-| 10 | Battle HUD that scales with many boss parts | Pending |
+| 10 | Battle HUD that scales with many boss parts | Done |
 | 11 | Missile and Laser content | Pending |
 
 ## Requirements
@@ -134,8 +134,18 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
   covers are gone, the inner part takes hits normally.
 - This rule lives in the domain, so it does not depend on which hitbox Flame
   reports first.
-- Covered parts are drawn darker and their HUD bar is grey. Outer layers are
-  drawn on top of what they cover.
+- Covered parts are drawn darker and their integrity bar is grey. Outer layers
+  are drawn on top of what they cover.
+
+### Battle HUD
+
+- The top of the screen shows only the boss name, its pattern, one bar with
+  the total integrity of every part, and the active adaptation.
+- Each part has its own thin integrity bar drawn in the arena, just above it;
+  it disappears when the part is destroyed. This scales with any number of
+  parts.
+- Banners (shield down, escape countdown, core exposed, drop to grab) sit at
+  the bottom, above the ship hull bar, so they never cover the boss.
 - Hull (`BossComponentKind.hull`) is plain outer plating: it protects, never
   attacks and never drops anything.
 - Every part belongs to a zone by its horizontal offset from the boss
@@ -255,8 +265,8 @@ fought and defeated, last battle record) survive an app restart.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.
-- The battle HUD lists one bar per boss part and covers the top of the
-  bosses now that they have five or six parts (step 10).
+- Part integrity bars sit just above each part, so a bar can overlap the part
+  right above it (e.g. the Warden plate bar touches the core).
 
 ## Tests
 

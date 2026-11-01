@@ -80,14 +80,12 @@ class _BattleHud extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            for (final part in hud.bossParts) _PartBar(part: part),
-            _PartBar(
-              part: BossPartHud(
-                name: 'Observer',
-                integrity: hud.observerIntegrity,
-                maxIntegrity: hud.observerMaxIntegrity,
-              ),
+            const SizedBox(height: 4),
+            LinearProgressIndicator(
+              value: hud.bossIntegrityRatio,
+              minHeight: 4,
+              color: const Color(0xFF7CFFB2),
+              backgroundColor: Colors.white24,
             ),
             if (_adaptations(hud) case final adaptations?) ...[
               const SizedBox(height: 4),
@@ -98,7 +96,7 @@ class _BattleHud extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 8),
+            const Spacer(),
             if (hud.hasCoreShield && hud.shieldBreakTimeLeft > 0) ...[
               _Banner(
                 text:
@@ -123,8 +121,9 @@ class _BattleHud extends StatelessWidget {
                     '${drop.timeLeft.toStringAsFixed(1)}s',
                 color: const Color(0xFFFFC857),
               ),
+              const SizedBox(height: 6),
             ],
-            const Spacer(),
+            const SizedBox(height: 8),
             Text('Hull', style: textTheme.labelSmall),
             const SizedBox(height: 4),
             LinearProgressIndicator(
@@ -155,40 +154,6 @@ class _BattleHud extends StatelessWidget {
         'core window ${hud.coreWindowOpenDuration.toStringAsFixed(0)}s',
     ];
     return parts.isEmpty ? null : parts.join('  •  ');
-  }
-}
-
-class _PartBar extends StatelessWidget {
-  const _PartBar({required this.part});
-
-  final BossPartHud part;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelSmall;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(width: 56, child: Text(part.name, style: style)),
-          Expanded(
-            child: part.isDestroyed
-                ? Text(
-                    'DESTROYED',
-                    style: style?.copyWith(color: Colors.white38),
-                  )
-                : LinearProgressIndicator(
-                    value: part.ratio,
-                    minHeight: 4,
-                    color: part.covered
-                        ? Colors.white38
-                        : const Color(0xFF7CFFB2),
-                    backgroundColor: Colors.white24,
-                  ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
