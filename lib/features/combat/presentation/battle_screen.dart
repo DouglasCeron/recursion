@@ -152,6 +152,7 @@ class _BattleHud extends StatelessWidget {
             '−${((1 - hud.weaponDamageMultiplier) * 100).round()}%',
       if (hud.coreWindowShortened)
         'core window ${hud.coreWindowOpenDuration.toStringAsFixed(0)}s',
+      if (hud.reinforcedZone case final zone?) '${zone.name} zone reinforced',
     ];
     return parts.isEmpty ? null : parts.join('  •  ');
   }

@@ -8,6 +8,7 @@ import '../../ship/domain/weapon_catalog.dart';
 import '../application/battle_session.dart';
 import '../domain/content/boss_catalog.dart';
 import '../domain/entities/battle_state.dart';
+import '../domain/entities/boss_definition.dart';
 import '../domain/entities/boss_modifiers.dart';
 import '../domain/entities/boss_state.dart';
 import '../domain/entities/dropped_item.dart';
@@ -82,6 +83,7 @@ class BattleHudState {
     required this.weaponDamageMultiplier,
     required this.coreWindowOpenDuration,
     required this.coreWindowShortened,
+    required this.reinforcedZone,
   });
 
   factory BattleHudState.fromBattle(BattleState battle) {
@@ -121,6 +123,7 @@ class BattleHudState {
       ),
       coreWindowOpenDuration: boss.coreWindow.openDuration,
       coreWindowShortened: boss.modifiers.coreWindowOpenDuration != null,
+      reinforcedZone: boss.modifiers.reinforcement?.zone,
     );
   }
 
@@ -154,6 +157,7 @@ class BattleHudState {
   final double weaponDamageMultiplier;
   final double coreWindowOpenDuration;
   final bool coreWindowShortened;
+  final BossZone? reinforcedZone;
 
   double get hullRatio => hull / maxHull;
   double get bossIntegrityRatio => bossIntegrity / bossMaxIntegrity;

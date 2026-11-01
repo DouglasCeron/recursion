@@ -1,3 +1,4 @@
+import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/combat_log.dart';
 import '../../ship/domain/weapon_definition.dart';
 
@@ -30,11 +31,19 @@ class WeaponExposureProfile {
   const WeaponExposureProfile({
     required this.weapons,
     required this.weakPointFocus,
+    this.zoneShares = const {},
   });
 
   factory WeaponExposureProfile.fromStats(CombatStats stats) {
     final total = stats.totalDamage;
+    final zoneTotal = stats.zoneDamage.values.fold(0, (sum, d) => sum + d);
     return WeaponExposureProfile(
+      zoneShares: {
+        if (zoneTotal > 0)
+          for (final MapEntry(key: zone, value: damage)
+              in stats.zoneDamage.entries)
+            zone: damage / zoneTotal,
+      },
       weapons: {
         for (final MapEntry(key: type, value: usage) in stats.weapons.entries)
           if (usage.shots > 0)
@@ -67,6 +76,10 @@ class WeaponExposureProfile {
   /// Fraction of core damage dealt while the core was exposed, or null if
   /// the core was never damaged.
   final double? weakPointFocus;
+
+  /// Fraction (0..1) of the damage dealt to boss parts that landed in each
+  /// zone. Zones never hit are absent.
+  final Map<BossZone, double> zoneShares;
 
   bool get exploitsWeakPoint =>
       (weakPointFocus ?? 0) >= weakPointExploitThreshold;

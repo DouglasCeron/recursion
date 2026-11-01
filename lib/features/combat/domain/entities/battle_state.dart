@@ -4,6 +4,7 @@ import '../events/battle_event.dart';
 import '../rules/damage_rules.dart';
 import 'battle_record.dart';
 import 'boss_component_state.dart';
+import 'boss_definition.dart';
 import 'boss_state.dart';
 import 'combat_log.dart';
 import 'dropped_item.dart';
@@ -167,6 +168,7 @@ class BattleState {
     _recordHit(
       weapon.type,
       damage: hit.damage,
+      zone: boss.definition.component(hit.componentId).zone,
       onCore: boss.component(hit.componentId)!.kind == BossComponentKind.core,
       coreExposed: hit.weakPointBonus,
     );
@@ -262,18 +264,21 @@ class BattleState {
   void _recordHit(
     WeaponType type, {
     required int damage,
+    BossZone? zone,
     bool onCore = false,
     bool coreExposed = false,
   }) {
     _log.recordHit(
       type,
       damage: damage,
+      zone: zone,
       onCore: onCore,
       coreExposed: coreExposed,
     );
     observer.observeHit(
       type,
       damage: damage,
+      zone: zone,
       onCore: onCore,
       coreExposed: coreExposed,
     );

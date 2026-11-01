@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/combat/presentation/battle_providers.dart';
 import 'package:recursion/features/inventory/application/inventory_controller.dart';
@@ -131,7 +132,24 @@ void main() {
           reason: 'the $side cannon is only reachable through its housing',
         );
       }
-      expect(destroyed, contains('warden.plate'));
+      expect(
+        session.state.boss.modifiers.reinforcement?.zone,
+        BossZone.center,
+        reason: 'every Sentinel shot went to its center',
+      );
+      expect(
+        destroyed.indexOf('boss.warden.reinforcement_center'),
+        lessThan(destroyed.indexOf('warden.plate')),
+      );
+      expect(session.state.boss.component('warden.plate')!.maxIntegrity, 150);
+      expect(
+        container.read(battleHudProvider(_warden)).reinforcedZone,
+        BossZone.center,
+      );
+      expect(
+        session.state.record.stats.zoneDamage.keys,
+        containsAll([BossZone.left, BossZone.center, BossZone.right]),
+      );
       expect(
         session.state.boss.modifiers.damageMultiplierFor(WeaponType.blaster),
         0.7,

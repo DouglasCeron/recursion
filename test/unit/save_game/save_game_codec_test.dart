@@ -5,6 +5,7 @@ import 'package:recursion/features/boss_evolution/domain/boss_intel.dart';
 import 'package:recursion/features/boss_evolution/domain/weapon_exposure_profile.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/battle_record.dart';
+import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/entities/combat_log.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/inventory/domain/inventory.dart';
@@ -21,6 +22,7 @@ const stats = CombatStats(
   },
   coreDamage: 400,
   coreDamageWhileExposed: 260,
+  zoneDamage: {BossZone.center: 450, BossZone.left: 150},
 );
 
 SaveGame sampleGame() {
@@ -68,6 +70,10 @@ void main() {
     final original = WeaponExposureProfile.fromStats(stats);
     expect(report.sequence, 1);
     expect(report.profile.weakPointFocus, original.weakPointFocus);
+    expect(report.profile.zoneShares, {
+      BossZone.center: 0.75,
+      BossZone.left: 0.25,
+    });
     for (final type in original.weapons.keys) {
       final restored = report.profile.weapons[type]!;
       expect(restored.level, original.weapons[type]!.level);
@@ -83,6 +89,7 @@ void main() {
     expect(record.duration, 42.5);
     expect(record.stats.weapons[WeaponType.heavyCannon]!.hits, 9);
     expect(record.stats.coreDamageWhileExposed, 260);
+    expect(record.stats.zoneDamage, {BossZone.center: 450, BossZone.left: 150});
     expect(record.destroyedComponentIds, hasLength(2));
     expect(record.intelTransmitted, isTrue);
   });
@@ -159,12 +166,53 @@ void main() {
   });
 
   group('migrations', () {
-    /// The v1 document the previous release would have written for [game].
-    String v1Of(SaveGame game) {
+    /// The v2 document an earlier release would have written for [game]:
+    /// no damage per zone.
+    Map<String, Object?> v2DocumentOf(SaveGame game) {
       final document = documentOf(game);
+      for (final report in ((document['intel'] as Map)['reports'] as List)) {
+        (report as Map).remove('zoneShares');
+      }
+      final lastBattle = (document['progress'] as Map)['lastBattle'] as Map?;
+      (lastBattle?['stats'] as Map?)?.remove('zoneDamage');
+      return {...document, 'schemaVersion': 2};
+    }
+
+    String v2Of(SaveGame game) => jsonEncode(v2DocumentOf(game));
+
+    /// The v1 document: v2 without defeated bosses.
+    String v1Of(SaveGame game) {
+      final document = v2DocumentOf(game);
       (document['progress'] as Map).remove('defeatedBossIds');
       return jsonEncode({...document, 'schemaVersion': 1});
     }
+
+    test('v2 saves load with no damage per zone', () {
+      final result = codec.decode(v2Of(sampleGame()));
+
+      expect(result.status, SaveLoadStatus.loaded);
+      expect(result.game.intel.latest!.profile.zoneShares, isEmpty);
+      expect(result.game.intel.latest!.profile.weakPointFocus, 0.65);
+      expect(result.game.progress.lastBattle!.stats.zoneDamage, isEmpty);
+      expect(result.game.progress.defeatedBossIds, {BossCatalog.sentinel.id});
+    });
+
+    test('unknown zones are dropped', () {
+      final document = documentOf(sampleGame());
+      final report =
+          ((document['intel'] as Map)['reports'] as List).single as Map;
+      report['zoneShares'] = {'center': 0.6, 'top': 0.4};
+
+      final shares = codec
+          .decode(jsonEncode(document))
+          .game
+          .intel
+          .latest!
+          .profile
+          .zoneShares;
+
+      expect(shares, {BossZone.center: 0.6});
+    });
 
     test('v1 saves load, counting a last-battle victory as defeated', () {
       final result = codec.decode(v1Of(sampleGame()));
@@ -201,11 +249,11 @@ void main() {
     });
 
     test('migrations run in sequence up to the current version', () {
-      final v3Codec = SaveGameCodec(
-        version: 3,
+      final v4Codec = SaveGameCodec(
+        version: 4,
         migrations: {
           ...SaveGameCodec.defaultMigrations,
-          2: (document) => {
+          3: (document) => {
             ...document,
             'inventory': {
               'itemIds': [WeaponCatalog.heavyCannon.id],
@@ -214,7 +262,7 @@ void main() {
         },
       );
 
-      final result = v3Codec.decode(v1Of(SaveGame.initial()));
+      final result = v4Codec.decode(v1Of(SaveGame.initial()));
 
       expect(result.status, SaveLoadStatus.loaded);
       expect(
@@ -226,7 +274,9 @@ void main() {
     test('a missing migration marks the save as unreadable', () {
       final current = codec.encode(SaveGame.initial());
 
-      final result = const SaveGameCodec(version: 3).decode(current);
+      final result = const SaveGameCodec(
+        version: SaveGameCodec.currentVersion + 1,
+      ).decode(current);
 
       expect(result.status, SaveLoadStatus.corrupted);
     });

@@ -4,6 +4,7 @@ import '../../boss_evolution/domain/boss_intel.dart';
 import '../../boss_evolution/domain/weapon_exposure_profile.dart';
 import '../../combat/domain/content/boss_catalog.dart';
 import '../../combat/domain/entities/battle_record.dart';
+import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/combat_log.dart';
 import '../../combat/domain/events/battle_event.dart';
 import '../../inventory/domain/inventory.dart';
@@ -27,11 +28,44 @@ class SaveGameCodec {
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 2;
+  static const currentVersion = 3;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
-  static const defaultMigrations = <int, SaveMigration>{1: _addDefeatedBosses};
+  static const defaultMigrations = <int, SaveMigration>{
+    1: _addDefeatedBosses,
+    2: _addZoneDamage,
+  };
+
+  /// v3 tracks damage per boss zone. Older reports and battles did not
+  /// record it, so they start with none (and never trigger a reinforcement).
+  static JsonMap _addZoneDamage(JsonMap document) {
+    final intel = document['intel'] as JsonMap;
+    final progress = document['progress'] as JsonMap;
+    final lastBattle = progress['lastBattle'] as JsonMap?;
+    return {
+      ...document,
+      'intel': {
+        ...intel,
+        'reports': [
+          for (final report in (intel['reports'] as List).cast<JsonMap>())
+            {...report, 'zoneShares': <String, Object?>{}},
+        ],
+      },
+      'progress': {
+        ...progress,
+        'lastBattle': lastBattle == null
+            ? null
+            : {
+                ...lastBattle,
+                'stats': {
+                  ...lastBattle['stats'] as JsonMap,
+                  'zoneDamage': <String, Object?>{},
+                },
+              },
+      },
+    };
+  }
 
   /// v2 tracks defeated bosses. A v1 save only knows its last battle, so
   /// that boss counts as defeated if that battle was a victory.
@@ -93,6 +127,11 @@ class SaveGameCodec {
   static JsonMap _encodeReport(IntelReport report) => {
     'sequence': report.sequence,
     'weakPointFocus': report.profile.weakPointFocus,
+    'zoneShares': {
+      for (final MapEntry(key: zone, value: share)
+          in report.profile.zoneShares.entries)
+        zone.name: share,
+    },
     'weapons': [
       for (final w in report.profile.weapons.values)
         {
@@ -132,6 +171,11 @@ class SaveGameCodec {
       ],
       'coreDamage': record.stats.coreDamage,
       'coreDamageWhileExposed': record.stats.coreDamageWhileExposed,
+      'zoneDamage': {
+        for (final MapEntry(key: zone, value: damage)
+            in record.stats.zoneDamage.entries)
+          zone.name: damage,
+      },
     },
     'destroyedComponentIds': record.destroyedComponentIds,
     'collectedItemIds': record.collectedItemIds,
@@ -169,6 +213,11 @@ class SaveGameCodec {
     sequence: json['sequence'] as int,
     profile: WeaponExposureProfile(
       weakPointFocus: (json['weakPointFocus'] as num?)?.toDouble(),
+      zoneShares: Map.unmodifiable({
+        for (final MapEntry(:key, :value)
+            in (json['zoneShares'] as JsonMap).entries)
+          ?_zone(key): (value as num).toDouble(),
+      }),
       weapons: {
         for (final exposure
             in (json['weapons'] as List)
@@ -221,6 +270,11 @@ class SaveGameCodec {
         }),
         coreDamage: stats['coreDamage'] as int,
         coreDamageWhileExposed: stats['coreDamageWhileExposed'] as int,
+        zoneDamage: Map.unmodifiable({
+          for (final MapEntry(:key, :value)
+              in (stats['zoneDamage'] as JsonMap).entries)
+            ?_zone(key): value as int,
+        }),
       ),
       destroyedComponentIds: List.unmodifiable(
         _strings(json['destroyedComponentIds']),
@@ -240,6 +294,8 @@ class SaveGameCodec {
 
   static WeaponType? _weaponType(Object? name) =>
       _enum(WeaponType.values, name);
+
+  static BossZone? _zone(Object? name) => _enum(BossZone.values, name);
 
   static T? _enum<T extends Enum>(List<T> values, Object? name) =>
       name == null ? null : values.asNameMap()[name as String];

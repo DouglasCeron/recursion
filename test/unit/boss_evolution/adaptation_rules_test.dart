@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/boss_evolution/domain/boss_evolution.dart';
 import 'package:recursion/features/boss_evolution/domain/boss_intel.dart';
 import 'package:recursion/features/boss_evolution/domain/weapon_exposure_profile.dart';
+import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/entities/combat_log.dart';
 import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
@@ -9,6 +11,7 @@ BossIntel intelWith(
   Map<WeaponType, int> damageByType, {
   int coreDamage = 0,
   int coreDamageWhileExposed = 0,
+  Map<BossZone, int> zoneDamage = const {},
 }) => const BossIntel().withReport(
   WeaponExposureProfile.fromStats(
     CombatStats(
@@ -18,6 +21,7 @@ BossIntel intelWith(
       },
       coreDamage: coreDamage,
       coreDamageWhileExposed: coreDamageWhileExposed,
+      zoneDamage: zoneDamage,
     ),
   ),
 );
@@ -134,5 +138,72 @@ void main() {
 
     expect(heavy.damageMultipliers, {WeaponType.heavyCannon: 0.6});
     expect(blaster.damageMultipliers, {WeaponType.blaster: 0.7});
+  });
+
+  test('every boss after the first adapts', () {
+    expect(AdaptationRules.adaptiveBossIds, {
+      for (final boss in BossCatalog.all.skip(1)) boss.id,
+    });
+    expect(
+      AdaptationRules.adaptiveBossIds,
+      isNot(contains(BossCatalog.all.first.id)),
+    );
+  });
+
+  group('zone focus', () {
+    test('the most hit zone is reinforced from 45% of the damage', () {
+      final evolution = AdaptationRules.evolve(
+        intelWith(
+          {},
+          zoneDamage: {
+            BossZone.left: 45,
+            BossZone.center: 30,
+            BossZone.right: 25,
+          },
+        ),
+      );
+
+      final reinforcement = evolution.countermeasures.single;
+      expect(reinforcement.kind, CountermeasureKind.zoneReinforcement);
+      expect(reinforcement.zoneShare, 0.45);
+      final modifiers = evolution.toModifiers();
+      expect(modifiers.reinforcement?.zone, BossZone.left);
+      expect(modifiers.reinforcement?.integrityMultiplier, 1.5);
+      expect(modifiers.reinforcement?.plateIntegrity, 80);
+      expect(modifiers.isAdapted, isTrue);
+    });
+
+    test('spread damage below 45% reinforces nothing', () {
+      final evolution = AdaptationRules.evolve(
+        intelWith(
+          {},
+          zoneDamage: {
+            BossZone.left: 44,
+            BossZone.center: 30,
+            BossZone.right: 26,
+          },
+        ),
+      );
+
+      expect(evolution.isEmpty, isTrue);
+      expect(evolution.toModifiers().reinforcement, isNull);
+    });
+
+    test('only one zone is reinforced, from the latest report', () {
+      final intel = intelWith({}, zoneDamage: {BossZone.left: 100}).withReport(
+        WeaponExposureProfile.fromStats(
+          const CombatStats(
+            weapons: {},
+            coreDamage: 0,
+            coreDamageWhileExposed: 0,
+            zoneDamage: {BossZone.right: 60, BossZone.center: 40},
+          ),
+        ),
+      );
+
+      final modifiers = AdaptationRules.evolve(intel).toModifiers();
+
+      expect(modifiers.reinforcement?.zone, BossZone.right);
+    });
   });
 }

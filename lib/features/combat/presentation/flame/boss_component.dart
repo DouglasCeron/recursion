@@ -133,6 +133,10 @@ class BossPartComponent extends PositionComponent {
     ..color = const Color(0xFF4DD0E1)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 2;
+  static final _reinforcedPaint = Paint()
+    ..color = const Color(0xFFFFB74D)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
 
   @override
   Future<void> onLoad() async {
@@ -195,7 +199,9 @@ class BossPartComponent extends PositionComponent {
           : canvas.drawRect(shade, _coveredShadePaint);
     }
     _renderIntegrityBar(canvas, rect);
-    if (boss.modifiers.damageMultipliers.isNotEmpty &&
+    if (definition.reinforced) {
+      canvas.drawRect(rect.inflate(2), _reinforcedPaint);
+    } else if (boss.modifiers.damageMultipliers.isNotEmpty &&
         definition.kind != BossComponentKind.core) {
       canvas.drawRect(rect.inflate(2), _adaptedPaint);
     }

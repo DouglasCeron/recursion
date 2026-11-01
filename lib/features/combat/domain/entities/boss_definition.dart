@@ -19,6 +19,7 @@ class BossComponentDefinition {
     required this.height,
     this.dropItemId,
     this.coveredBy = const [],
+    this.reinforced = false,
   });
 
   /// Parts at most this far from the boss center belong to the center zone.
@@ -40,11 +41,37 @@ class BossComponentDefinition {
   /// part are absorbed by the first one still standing.
   final List<String> coveredBy;
 
+  /// Whether this part was strengthened by a zone reinforcement.
+  final bool reinforced;
+
   BossZone get zone => switch (offsetX) {
     < -centerZoneHalfWidth => BossZone.left,
     > centerZoneHalfWidth => BossZone.right,
     _ => BossZone.center,
   };
+
+  double get left => offsetX - width / 2;
+  double get right => offsetX + width / 2;
+  double get top => offsetY - height / 2;
+  double get bottom => offsetY + height / 2;
+
+  BossComponentDefinition copyWith({
+    int? maxIntegrity,
+    List<String>? coveredBy,
+    bool? reinforced,
+  }) => BossComponentDefinition(
+    id: id,
+    name: name,
+    kind: kind,
+    maxIntegrity: maxIntegrity ?? this.maxIntegrity,
+    offsetX: offsetX,
+    offsetY: offsetY,
+    width: width,
+    height: height,
+    dropItemId: dropItemId,
+    coveredBy: coveredBy ?? this.coveredBy,
+    reinforced: reinforced ?? this.reinforced,
+  );
 }
 
 /// Single shots aimed at the ship, fired while the cannon is operational.
@@ -126,6 +153,24 @@ class BossDefinition {
   final double? shieldBreakDuration;
 
   bool get hasCoreShield => shieldBreakDuration != null;
+
+  BossDefinition withComponents(List<BossComponentDefinition> components) =>
+      BossDefinition(
+        id: id,
+        name: name,
+        components: components,
+        coreWindow: coreWindow,
+        coreVulnerableMultiplier: coreVulnerableMultiplier,
+        escapeRule: escapeRule,
+        aimedShot: aimedShot,
+        burst: burst,
+        initialAttackDelay: initialAttackDelay,
+        verticalPosition: verticalPosition,
+        driftRange: driftRange,
+        driftSpeed: driftSpeed,
+        enragedDriftSpeed: enragedDriftSpeed,
+        shieldBreakDuration: shieldBreakDuration,
+      );
 
   BossComponentDefinition component(String id) =>
       components.firstWhere((c) => c.id == id);

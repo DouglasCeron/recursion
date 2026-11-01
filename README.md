@@ -24,7 +24,7 @@ After the proof of concept:
 |---|---|---|
 | 7 | Campaign map, reset progress, save schema v2 (defeated bosses) | Done |
 | 8 | Layered boss structures that cover inner parts | Done |
-| 9 | Player focus by zone; the next boss reinforces the focused zone | Pending |
+| 9 | Player focus by zone; the next boss reinforces the focused zone | Done |
 | 10 | Battle HUD that scales with many boss parts | Done |
 | 11 | Missile and Laser content | Pending |
 
@@ -172,8 +172,9 @@ Three separate concepts:
    duration, per-weapon shots/hits/damage, core damage, destroyed parts,
    collected items). Always complete.
 2. **Observer transmission** — what the enemy drone recorded while alive:
-   per-weapon-type shots, hits and damage, plus core damage dealt while the
-   core was exposed. Nothing else (no inventory, no positions).
+   per-weapon-type shots, hits and damage, damage per boss zone, plus core
+   damage dealt while the core was exposed. Nothing else (no inventory, no
+   positions).
 3. **`BossIntel`** — the reports the enemy faction actually received. It only
    grows; reports from earlier battles are never erased.
 
@@ -191,6 +192,11 @@ Rules:
 - **Weak point focus** is the share of core damage dealt while the core was
   exposed; at **50% or more** the profile flags the player as exploiting the
   weak point.
+- **Zone focus** is the share of damage dealt to boss parts that landed in
+  each zone (left, center, right). A part belongs to the center zone if its
+  center is at most 20 units from the boss center. The zone is the one of the
+  part that actually took the hit (the outer cover, when one absorbed it).
+  Hits on the observer do not count.
 - Metrics are aggregated in memory during the battle; nothing is written per
   shot.
 
@@ -216,14 +222,28 @@ The escape is announced when the core drops to 30% (108 of 360).
   it is only exposed when the shield is down.
 - Escape follows the same rule as the Sentinel (core at 30%, 5 s).
 
-Only the Warden adapts, and only from the **latest intel report** (never from
-the inventory):
+Every boss after the first adapts (today, the Warden), only from the
+**latest intel report** (never from the inventory):
 
 | Observed | Countermeasure |
 |---|---|
 | Heavy Cannon medium / high | Impact plating: −20% / −40% damage from it |
 | Blaster medium / high | Deflector screen: −15% / −30% damage from it |
 | Weak point exploited | Core exposure shortened from 3 s to 2 s |
+| One zone took ≥ 45% of the damage | That zone is reinforced (below) |
+
+**Zone reinforcement**
+
+- Only the most hit zone, and only if it took at least **45%** of the damage
+  dealt to boss parts. One zone at most; it does not stack with earlier
+  reports.
+- Every structure in that zone gets **+50% max integrity**. The core is not a
+  structure and keeps its integrity, so the escape threshold does not change.
+- An extra **reinforcement plate** (armor, 80 integrity) is placed just below
+  the zone, spanning its parts. It covers every part of the zone that had no
+  cover, so it has to break first.
+- Reinforced parts get an orange outline in battle, and the HUD and the
+  briefing name the zone and the share of damage that caused it.
 
 - Reductions never exceed **40%**, and a fully **exposed core always takes
   full (×2) damage**, so every build can still win.
@@ -240,7 +260,7 @@ the inventory):
 Inventory, equipped weapon, enemy intel and progress (battles fought, bosses
 fought and defeated, last battle record) survive an app restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 2) in
+- Stored as one JSON document with a `schemaVersion` (currently 3) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -254,7 +274,8 @@ fought and defeated, last battle record) survive an app restart.
 - Schema changes go through `SaveGameCodec.migrations`, one step per version.
   `migrations[1]` upgrades v1 to v2 by adding the defeated bosses: v1 only
   knew the last battle, so its boss counts as defeated if that battle was a
-  victory.
+  victory. `migrations[2]` upgrades v2 to v3 by adding damage per zone: older
+  reports and battles get none, so they never trigger a reinforcement.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
@@ -272,13 +293,15 @@ fought and defeated, last battle record) survive an app restart.
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
   escape rule, boss behavior, drops, observer, battle record, exposure
-  profile, intel, adaptation rules, Warden shield and modifiers, boss
+  profile, intel, adaptation rules, zone damage and reinforcement, Warden
+  shield and modifiers, boss
   unlocks, ship movement/firing/hull, battle state, inventory and loadout,
   save codec and versioning, shared preferences adapter).
 - `test/integration/` — full boss battles (victory and escape) played through
   `BattleSession`, drop collection wired to the inventory, observer
   transmissions reaching (or not reaching) the enemy intel, different weapon
-  usage producing different Warden setups, and an app restart restoring the
+  usage producing different Warden setups, a center-focused Sentinel battle
+  reinforcing the Warden's center, and an app restart restoring the
   save, all through Riverpod without rendering.
 - `test/widget/` — main menu, campaign map states and navigation, and the
   reset confirmation.

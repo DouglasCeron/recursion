@@ -78,6 +78,10 @@ class BriefingScreen extends ConsumerWidget {
     CountermeasureKind.shortenedCoreWindow =>
       'Core exposure shortened to '
           '${c.coreWindowOpenDuration?.toStringAsFixed(0)}s',
+    CountermeasureKind.zoneReinforcement =>
+      'Reinforced ${c.reinforcement?.zone.name} zone: structures '
+          '+${_percent((c.reinforcement?.integrityMultiplier ?? 1) - 1)} '
+          'and an extra plate',
   };
 
   static String _reason(Countermeasure c) => switch (c.kind) {
@@ -86,6 +90,9 @@ class BriefingScreen extends ConsumerWidget {
           '${_weaponName(c.weaponType)}.',
     CountermeasureKind.shortenedCoreWindow =>
       'The observer saw you hitting the core while it was exposed.',
+    CountermeasureKind.zoneReinforcement =>
+      'You dealt ${_percent(c.zoneShare)} of your damage to the '
+          '${c.reinforcement?.zone.name} zone.',
   };
 
   static String _weaponName(WeaponType? type) => switch (type) {
