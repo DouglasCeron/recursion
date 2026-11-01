@@ -26,7 +26,7 @@ final battleSessionProvider = Provider.autoDispose
       final boss = BossCatalog.byId(bossId) ?? BossCatalog.sentinel;
       final weapon = ref.read(inventoryControllerProvider).equippedWeapon;
       final modifiers = AdaptationRules.adaptiveBossIds.contains(boss.id)
-          ? ref.read(bossEvolutionProvider).toModifiers()
+          ? ref.read(bossEvolutionProvider(boss.id)).toModifiers()
           : BossModifiers.none;
       final session = BattleSession.boss(
         boss: boss,
@@ -42,7 +42,7 @@ final battleSessionProvider = Provider.autoDispose
           case ObserverTransmitted():
             ref
                 .read(bossIntelControllerProvider.notifier)
-                .receiveTransmission(event.stats);
+                .receiveTransmission(event.stats, bossId: boss.id);
           case BattleCompleted():
             ref
                 .read(progressControllerProvider.notifier)

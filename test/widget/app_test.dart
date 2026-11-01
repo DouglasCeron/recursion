@@ -25,7 +25,7 @@ Finder nodeOf(String bossId) => find.byKey(Key('campaign.node.$bossId'));
 
 void main() {
   final sentinel = BossCatalog.sentinel.id;
-  final warden = BossCatalog.warden.id;
+  final mk2 = BossCatalog.sentinelMk2.id;
 
   testWidgets('home leads to the campaign, not to individual bosses', (
     tester,
@@ -41,7 +41,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1. Sentinel'), findsOneWidget);
-    expect(find.text('2. Warden'), findsOneWidget);
+    expect(find.text('2. Sentinel Mk II'), findsOneWidget);
   });
 
   testWidgets('a new campaign has only the first boss available', (
@@ -59,7 +59,7 @@ void main() {
     expect(find.text('Available'), findsOneWidget);
     expect(find.text('Locked'), findsOneWidget);
 
-    await tester.tap(nodeOf(warden));
+    await tester.tap(nodeOf(mk2));
     expect(selected, isNull);
     await tester.tap(nodeOf(sentinel));
     expect(selected, sentinel);
@@ -86,8 +86,8 @@ void main() {
 
     expect(find.text('Defeated'), findsOneWidget);
     expect(find.text('Available'), findsOneWidget);
-    await tester.tap(nodeOf(warden));
-    expect(selected, warden);
+    await tester.tap(nodeOf(mk2));
+    expect(selected, mk2);
   });
 
   testWidgets('reset progress asks first, then wipes the campaign', (

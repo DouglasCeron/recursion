@@ -26,7 +26,8 @@ After the proof of concept:
 | 8 | Layered boss structures that cover inner parts | Done |
 | 9 | Player focus by zone; the next boss reinforces the focused zone | Done |
 | 10 | Battle HUD that scales with many boss parts | Done |
-| 11 | Missile and Laser content | Pending |
+| 11 | Boss 2 becomes the Sentinel Mk II, evolved from the Sentinel's damage history | Done |
+| — | Laser as a weapon of a future boss; Missile | Pending |
 
 ## Requirements
 
@@ -40,8 +41,8 @@ flutter pub get
 flutter run                    # opens the main menu
 flutter run --route /campaign  # opens the campaign map
 flutter run --route /battle    # jumps straight into the Sentinel battle
-flutter run --route "/battle?boss=boss.warden"    # straight into the Warden
-flutter run --route "/briefing?boss=boss.warden"  # the Warden briefing
+flutter run --route "/battle?boss=boss.sentinel_mk2"    # the Sentinel Mk II
+flutter run --route "/briefing?boss=boss.sentinel_mk2"  # its briefing
 ```
 
 Controls: drag anywhere on the screen to move the ship; weapons fire
@@ -49,9 +50,10 @@ automatically.
 
 Suggested first session: open Campaign and fight the Sentinel (destroy its
 cannon and touch the falling Heavy Cannon to collect it), equip it in
-Inventory, then pick the Warden on the map and read its briefing. Destroy the
-observer drone on the left edge if you do not want the enemy to learn from
-that battle.
+Inventory, then pick the Sentinel Mk II on the map and read its briefing: its
+armor is reinforced where you hit the Sentinel the most. Destroy the observer
+drone on the left edge if you do not want the enemy to learn from that
+battle.
 
 ## Campaign
 
@@ -136,6 +138,10 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
   reports first.
 - Covered parts are drawn darker and their integrity bar is grey. Outer layers
   are drawn on top of what they cover.
+- Hull (`BossComponentKind.hull`) is plain outer plating: it protects, never
+  attacks and never drops anything.
+- Every part belongs to a zone by its horizontal offset from the boss
+  center: left, center (within 20 units) or right.
 
 ### Battle HUD
 
@@ -146,10 +152,6 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
   parts.
 - Banners (shield down, escape countdown, core exposed, drop to grab) sit at
   the bottom, above the ship hull bar, so they never cover the boss.
-- Hull (`BossComponentKind.hull`) is plain outer plating: it protects, never
-  attacks and never drops anything.
-- Every part belongs to a zone by its horizontal offset from the boss
-  center: left, center (within 20 units) or right.
 
 ## Drops, inventory and loadout
 
@@ -200,37 +202,22 @@ Rules:
 - Metrics are aggregated in memory during the battle; nothing is written per
   shot.
 
-## Second boss: Warden (adaptive)
+## Second boss: Sentinel Mk II (evolved)
 
 Point 2 of the campaign, unlocked after the first Sentinel battle, whatever
 its outcome. It opens a briefing screen first.
 
-| Part | Integrity | Rule |
-|---|---|---|
-| Core | 360 | Covered by the front plate. Destroying it defeats the boss. Shielded while any cannon works. |
-| Front plate | 100 | Armor in front of the core. |
-| Left / right cannon | 120 each | Covered by their housing. Fire aimed shots in turns (0.9 s, 12 damage). |
-| Left / right housing | 80 each | Hull in front of each cannon. |
+Each boss is an evolution of the previous one. The Mk II is the Sentinel
+rebuilt (`BossCatalog.evolve`): same parts, positions, attacks, core window
+and escape rule (core at 30%, 120 of 400). Only its armor changes, from the
+intel about your **latest Sentinel battle**:
 
-Natural order: housing → cannon (the shield drops) → front plate → core.
-The escape is announced when the core drops to 30% (108 of 360).
-
-- **Shield:** blocks all core damage. Destroying a cannon drops it for
-  **3 s**; destroying both drops it for good and switches the attack to a
-  7-shot burst (100° spread, every 1.6 s, 8 damage each).
-- The core still uses the 8 s vulnerability window (×2 while exposed), but
-  it is only exposed when the shield is down.
-- Escape follows the same rule as the Sentinel (core at 30%, 5 s).
-
-Every boss after the first adapts (today, the Warden), only from the
-**latest intel report** (never from the inventory):
-
-| Observed | Countermeasure |
-|---|---|
-| Heavy Cannon medium / high | Impact plating: −20% / −40% damage from it |
-| Blaster medium / high | Deflector screen: −15% / −30% damage from it |
-| Weak point exploited | Core exposure shortened from 3 s to 2 s |
-| One zone took ≥ 45% of the damage | That zone is reinforced (below) |
+- Every boss after the first adapts, and only from the latest report of a
+  battle against the **previous boss** in the campaign. Each report records
+  the boss it came from; reports from other bosses (including a Mk II
+  rematch) are ignored. The inventory is never used.
+- Without that intel (no Sentinel battle yet, or its observer was destroyed),
+  the Mk II uses the default armor.
 
 **Zone reinforcement**
 
@@ -244,23 +231,20 @@ Every boss after the first adapts (today, the Warden), only from the
   cover, so it has to break first.
 - Reinforced parts get an orange outline in battle, and the HUD and the
   briefing name the zone and the share of damage that caused it.
-
-- Reductions never exceed **40%**, and a fully **exposed core always takes
-  full (×2) damage**, so every build can still win.
-- Low exposure, unused or merely owned weapons are never countered. Without
-  any intel, the Warden fights with its default setup.
-- The briefing lists each countermeasure and its reason. In battle, adapted
-  parts get a cyan outline, the core shows a shield ring while shielded, and
-  the HUD shows the active reductions and the shield-down countdown.
 - The combat domain only sees neutral `BossModifiers`; the rules that build
   them live in `boss_evolution` (`AdaptationRules`).
+
+Combat still supports mechanics no catalog boss uses yet: per-weapon damage
+multipliers, a shortened core window, and a core shield powered by cannons.
+They are covered by tests with a test-only boss (`test/support/`) and are
+available to future bosses.
 
 ## Saving
 
 Inventory, equipped weapon, enemy intel and progress (battles fought, bosses
 fought and defeated, last battle record) survive an app restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 3) in
+- Stored as one JSON document with a `schemaVersion` (currently 4) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -276,32 +260,40 @@ fought and defeated, last battle record) survive an app restart.
   knew the last battle, so its boss counts as defeated if that battle was a
   victory. `migrations[2]` upgrades v2 to v3 by adding damage per zone: older
   reports and battles get none, so they never trigger a reinforcement.
+  `migrations[3]` upgrades v3 to v4 by adding the boss each report came from:
+  older reports cannot be attributed, so no boss evolves from them.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
 ## Known limitations
 
 - Prototype content only: two bosses and two weapons (Missile and Laser
-  types exist in the domain but have no content yet).
+  types exist in the domain but have no content yet; the Laser is planned as
+  a weapon of a future boss).
+- The Sentinel concentrates most of its integrity in the center (670 of 740),
+  so a battle that ends in victory or escape almost always reinforces the
+  center. The side zones only get reinforced after short battles focused on
+  a wing.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.
 - Part integrity bars sit just above each part, so a bar can overlap the part
-  right above it (e.g. the Warden plate bar touches the core).
+  right above it (e.g. the armor bar touches the core).
 
 ## Tests
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
   escape rule, boss behavior, drops, observer, battle record, exposure
-  profile, intel, adaptation rules, zone damage and reinforcement, Warden
+  profile, intel, adaptation rules, zone damage and reinforcement, core
   shield and modifiers, boss
   unlocks, ship movement/firing/hull, battle state, inventory and loadout,
   save codec and versioning, shared preferences adapter).
 - `test/integration/` — full boss battles (victory and escape) played through
   `BattleSession`, drop collection wired to the inventory, observer
   transmissions reaching (or not reaching) the enemy intel, different weapon
-  usage producing different Warden setups, a center-focused Sentinel battle
-  reinforcing the Warden's center, and an app restart restoring the
+  a center-focused Sentinel battle reinforcing the Mk II's center (and the
+  Blaster still beating it), Mk II rematches not feeding its own evolution,
+  and an app restart restoring the
   save, all through Riverpod without rendering.
 - `test/widget/` — main menu, campaign map states and navigation, and the
   reset confirmation.

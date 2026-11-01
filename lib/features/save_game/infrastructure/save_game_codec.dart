@@ -28,14 +28,31 @@ class SaveGameCodec {
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 3;
+  static const currentVersion = 4;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
   static const defaultMigrations = <int, SaveMigration>{
     1: _addDefeatedBosses,
     2: _addZoneDamage,
+    3: _addReportBoss,
   };
+
+  /// v4 records which boss each report came from. Older reports cannot be
+  /// attributed, so no boss evolves from them.
+  static JsonMap _addReportBoss(JsonMap document) {
+    final intel = document['intel'] as JsonMap;
+    return {
+      ...document,
+      'intel': {
+        ...intel,
+        'reports': [
+          for (final report in (intel['reports'] as List).cast<JsonMap>())
+            {...report, 'bossId': null},
+        ],
+      },
+    };
+  }
 
   /// v3 tracks damage per boss zone. Older reports and battles did not
   /// record it, so they start with none (and never trigger a reinforcement).
@@ -126,6 +143,7 @@ class SaveGameCodec {
 
   static JsonMap _encodeReport(IntelReport report) => {
     'sequence': report.sequence,
+    'bossId': report.bossId,
     'weakPointFocus': report.profile.weakPointFocus,
     'zoneShares': {
       for (final MapEntry(key: zone, value: share)
@@ -211,6 +229,10 @@ class SaveGameCodec {
 
   static IntelReport _decodeReport(JsonMap json) => IntelReport(
     sequence: json['sequence'] as int,
+    bossId: switch (json['bossId'] as String?) {
+      final id? when BossCatalog.byId(id) != null => id,
+      _ => null,
+    },
     profile: WeaponExposureProfile(
       weakPointFocus: (json['weakPointFocus'] as num?)?.toDouble(),
       zoneShares: Map.unmodifiable({

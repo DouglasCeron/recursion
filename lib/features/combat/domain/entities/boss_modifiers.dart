@@ -51,20 +51,22 @@ class ZoneReinforcement {
       height: plateHeight,
       reinforced: true,
     );
-    return boss.withComponents([
-      for (final c in boss.components)
-        if (c.zone != zone)
-          c
-        else
-          c.copyWith(
-            maxIntegrity: c.kind == BossComponentKind.core
-                ? null
-                : (c.maxIntegrity * integrityMultiplier).round(),
-            coveredBy: c.coveredBy.isEmpty ? [plateId] : null,
-            reinforced: c.kind != BossComponentKind.core,
-          ),
-      plate,
-    ]);
+    return boss.copyWith(
+      components: [
+        for (final c in boss.components)
+          if (c.zone != zone)
+            c
+          else
+            c.copyWith(
+              maxIntegrity: c.kind == BossComponentKind.core
+                  ? null
+                  : (c.maxIntegrity * integrityMultiplier).round(),
+              coveredBy: c.coveredBy.isEmpty ? [plateId] : null,
+              reinforced: c.kind != BossComponentKind.core,
+            ),
+        plate,
+      ],
+    );
   }
 }
 

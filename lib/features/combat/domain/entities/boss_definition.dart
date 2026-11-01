@@ -56,11 +56,12 @@ class BossComponentDefinition {
   double get bottom => offsetY + height / 2;
 
   BossComponentDefinition copyWith({
+    String? id,
     int? maxIntegrity,
     List<String>? coveredBy,
     bool? reinforced,
   }) => BossComponentDefinition(
-    id: id,
+    id: id ?? this.id,
     name: name,
     kind: kind,
     maxIntegrity: maxIntegrity ?? this.maxIntegrity,
@@ -154,23 +155,26 @@ class BossDefinition {
 
   bool get hasCoreShield => shieldBreakDuration != null;
 
-  BossDefinition withComponents(List<BossComponentDefinition> components) =>
-      BossDefinition(
-        id: id,
-        name: name,
-        components: components,
-        coreWindow: coreWindow,
-        coreVulnerableMultiplier: coreVulnerableMultiplier,
-        escapeRule: escapeRule,
-        aimedShot: aimedShot,
-        burst: burst,
-        initialAttackDelay: initialAttackDelay,
-        verticalPosition: verticalPosition,
-        driftRange: driftRange,
-        driftSpeed: driftSpeed,
-        enragedDriftSpeed: enragedDriftSpeed,
-        shieldBreakDuration: shieldBreakDuration,
-      );
+  BossDefinition copyWith({
+    String? id,
+    String? name,
+    List<BossComponentDefinition>? components,
+  }) => BossDefinition(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    components: components ?? this.components,
+    coreWindow: coreWindow,
+    coreVulnerableMultiplier: coreVulnerableMultiplier,
+    escapeRule: escapeRule,
+    aimedShot: aimedShot,
+    burst: burst,
+    initialAttackDelay: initialAttackDelay,
+    verticalPosition: verticalPosition,
+    driftRange: driftRange,
+    driftSpeed: driftSpeed,
+    enragedDriftSpeed: enragedDriftSpeed,
+    shieldBreakDuration: shieldBreakDuration,
+  );
 
   BossComponentDefinition component(String id) =>
       components.firstWhere((c) => c.id == id);

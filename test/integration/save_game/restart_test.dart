@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/app/app_container.dart';
 import 'package:recursion/features/boss_evolution/application/boss_intel_controller.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/presentation/battle_providers.dart';
 import 'package:recursion/features/inventory/application/inventory_controller.dart';
 import 'package:recursion/features/progression/application/progress_controller.dart';
 import 'package:recursion/features/save_game/domain/save_game.dart';
 import 'package:recursion/features/save_game/infrastructure/in_memory_save_repository.dart';
 import 'package:recursion/features/ship/domain/weapon_catalog.dart';
-import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
 import '../../support/battle_driver.dart';
 
@@ -41,8 +41,8 @@ void main() {
     inventory.collect(WeaponCatalog.heavyCannon.id);
     inventory.equipWeapon(WeaponCatalog.heavyCannon.id);
     playBattle(first);
-    final wardenBefore = first
-        .read(battleSessionProvider(BossCatalog.warden.id))
+    final mk2Before = first
+        .read(battleSessionProvider(BossCatalog.sentinelMk2.id))
         .state
         .boss
         .modifiers;
@@ -57,15 +57,15 @@ void main() {
     expect(second.read(bossIntelControllerProvider).reports, hasLength(1));
     final progress = second.read(progressControllerProvider);
     expect(progress.battlesFought, 1);
-    expect(progress.isBossUnlocked(BossCatalog.warden.id), isTrue);
+    expect(progress.isBossUnlocked(BossCatalog.sentinelMk2.id), isTrue);
 
-    final wardenAfter = second
-        .read(battleSessionProvider(BossCatalog.warden.id))
+    final mk2After = second
+        .read(battleSessionProvider(BossCatalog.sentinelMk2.id))
         .state
         .boss
         .modifiers;
-    expect(wardenAfter.damageMultipliers, wardenBefore.damageMultipliers);
-    expect(wardenAfter.damageMultipliers, {WeaponType.heavyCannon: 0.6});
+    expect(mk2After.reinforcement?.zone, mk2Before.reinforcement?.zone);
+    expect(mk2After.reinforcement?.zone, BossZone.center);
   });
 
   test('a corrupted save starts a new game and is replaced', () async {

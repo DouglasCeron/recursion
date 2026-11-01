@@ -18,29 +18,29 @@ BattleRecord recordFor(String bossId, BattleOutcome outcome) => BattleRecord(
 
 void main() {
   final sentinel = BossCatalog.sentinel.id;
-  final warden = BossCatalog.warden.id;
+  final mk2 = BossCatalog.sentinelMk2.id;
 
-  test('the first boss is always unlocked; the Warden is not', () {
+  test('the first boss is always unlocked; the Sentinel Mk II is not', () {
     const progress = PlayerProgress();
 
     expect(progress.isBossUnlocked(sentinel), isTrue);
-    expect(progress.isBossUnlocked(warden), isFalse);
+    expect(progress.isBossUnlocked(mk2), isFalse);
   });
 
-  test('any finished Sentinel battle unlocks the Warden', () {
+  test('any finished Sentinel battle unlocks the Sentinel Mk II', () {
     for (final outcome in BattleOutcome.values) {
       final progress = const PlayerProgress().recordBattle(
         recordFor(sentinel, outcome),
       );
 
-      expect(progress.isBossUnlocked(warden), isTrue, reason: '$outcome');
+      expect(progress.isBossUnlocked(mk2), isTrue, reason: '$outcome');
     }
   });
 
   test('the campaign follows the boss catalog order', () {
-    expect(CampaignRules.order, [sentinel, warden]);
+    expect(CampaignRules.order, [sentinel, mk2]);
     expect(CampaignRules.requirementFor(sentinel), isNull);
-    expect(CampaignRules.requirementFor(warden), sentinel);
+    expect(CampaignRules.requirementFor(mk2), sentinel);
   });
 
   test('only a victory marks a boss as defeated', () {
@@ -59,14 +59,14 @@ void main() {
   });
 
   test('records count and the last battle', () {
-    final record = recordFor(warden, BattleOutcome.victory);
+    final record = recordFor(mk2, BattleOutcome.victory);
 
     final progress = const PlayerProgress()
         .recordBattle(recordFor(sentinel, BattleOutcome.defeat))
         .recordBattle(record);
 
     expect(progress.battlesFought, 2);
-    expect(progress.foughtBossIds, {sentinel, warden});
+    expect(progress.foughtBossIds, {sentinel, mk2});
     expect(progress.lastBattle, same(record));
   });
 }

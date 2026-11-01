@@ -93,10 +93,12 @@ class HomeScreen extends ConsumerWidget {
   static String _intelSummary(BossIntel intel) {
     final latest = intel.latest;
     if (latest == null) return 'Enemy intel: none';
-    final weapons = latest.profile.weapons.values
-        .map((w) => '${w.type.name} (${w.level.name})')
-        .join(', ');
+    final shares = latest.profile.zoneShares.entries;
+    final focus = shares.isEmpty
+        ? null
+        : shares.reduce((a, b) => b.value > a.value ? b : a);
     return 'Enemy intel: ${intel.reports.length} report(s)'
-        '${weapons.isEmpty ? '' : '\nLatest: $weapons'}';
+        '${focus == null ? '' : '\nLatest focus: ${focus.key.name} zone '
+                  '(${(focus.value * 100).round()}%)'}';
   }
 }

@@ -33,7 +33,10 @@ SaveGame sampleGame() {
       WeaponCatalog.heavyCannon.id,
       inventory: inventory,
     )!,
-    intel: const BossIntel().withReport(WeaponExposureProfile.fromStats(stats)),
+    intel: const BossIntel().withReport(
+      WeaponExposureProfile.fromStats(stats),
+      bossId: BossCatalog.sentinel.id,
+    ),
     progress: const PlayerProgress().recordBattle(
       BattleRecord(
         bossId: BossCatalog.sentinel.id,
@@ -70,6 +73,7 @@ void main() {
     final original = WeaponExposureProfile.fromStats(stats);
     expect(report.sequence, 1);
     expect(report.profile.weakPointFocus, original.weakPointFocus);
+    expect(report.bossId, BossCatalog.sentinel.id);
     expect(report.profile.zoneShares, {
       BossZone.center: 0.75,
       BossZone.left: 0.25,
@@ -83,7 +87,7 @@ void main() {
 
     final progress = game.progress;
     expect(progress.battlesFought, 1);
-    expect(progress.isBossUnlocked(BossCatalog.warden.id), isTrue);
+    expect(progress.isBossUnlocked(BossCatalog.sentinelMk2.id), isTrue);
     final record = progress.lastBattle!;
     expect(record.outcome, BattleOutcome.victory);
     expect(record.duration, 42.5);
@@ -151,8 +155,13 @@ void main() {
       'itemIds': ['weapon.removed'],
     };
     (document['progress'] as Map)['foughtBossIds'] = ['boss.removed'];
+    ((document['intel'] as Map)['reports'] as List)
+            .cast<Map>()
+            .single['bossId'] =
+        'boss.warden';
 
     final game = codec.decode(jsonEncode(document)).game;
+    expect(game.intel.latest!.bossId, isNull);
 
     expect(game.inventory.itemIds, {WeaponCatalog.blaster.id});
     expect(game.loadout.weaponId, WeaponCatalog.blaster.id);
@@ -166,10 +175,19 @@ void main() {
   });
 
   group('migrations', () {
-    /// The v2 document an earlier release would have written for [game]:
-    /// no damage per zone.
-    Map<String, Object?> v2DocumentOf(SaveGame game) {
+    /// The v3 document an earlier release would have written for [game]:
+    /// reports do not know their boss.
+    Map<String, Object?> v3DocumentOf(SaveGame game) {
       final document = documentOf(game);
+      for (final report in ((document['intel'] as Map)['reports'] as List)) {
+        (report as Map).remove('bossId');
+      }
+      return {...document, 'schemaVersion': 3};
+    }
+
+    /// The v2 document: v3 without damage per zone.
+    Map<String, Object?> v2DocumentOf(SaveGame game) {
+      final document = v3DocumentOf(game);
       for (final report in ((document['intel'] as Map)['reports'] as List)) {
         (report as Map).remove('zoneShares');
       }
@@ -177,6 +195,15 @@ void main() {
       (lastBattle?['stats'] as Map?)?.remove('zoneDamage');
       return {...document, 'schemaVersion': 2};
     }
+
+    test('v3 reports load without a boss, so nothing evolves from them', () {
+      final result = codec.decode(jsonEncode(v3DocumentOf(sampleGame())));
+
+      expect(result.status, SaveLoadStatus.loaded);
+      final report = result.game.intel.latest!;
+      expect(report.bossId, isNull);
+      expect(report.profile.zoneShares, isNotEmpty);
+    });
 
     String v2Of(SaveGame game) => jsonEncode(v2DocumentOf(game));
 
@@ -245,7 +272,7 @@ void main() {
       final progress = codec.decode(v1Of(lost)).game.progress;
 
       expect(progress.defeatedBossIds, isEmpty);
-      expect(progress.isBossUnlocked(BossCatalog.warden.id), isTrue);
+      expect(progress.isBossUnlocked(BossCatalog.sentinelMk2.id), isTrue);
     });
 
     test('migrations run in sequence up to the current version', () {

@@ -1,22 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:recursion/features/boss_evolution/application/boss_intel_controller.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/combat/presentation/battle_providers.dart';
-import 'package:recursion/features/inventory/application/inventory_controller.dart';
 import 'package:recursion/features/progression/application/progress_controller.dart';
-import 'package:recursion/features/ship/domain/weapon_catalog.dart';
-import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
 import '../../support/battle_driver.dart';
 
-final _warden = BossCatalog.warden.id;
-const _wardenOrder = [
-  'warden.cannon_left',
-  'warden.cannon_right',
-  'warden.core',
-];
+final _mk2 = BossCatalog.sentinelMk2.id;
+const _mk2Order = ['sentinel_mk2.core'];
 
 ProviderContainer newContainer() {
   final container = ProviderContainer();
@@ -24,58 +18,59 @@ ProviderContainer newContainer() {
   return container;
 }
 
-/// Gives the player the Heavy Cannon without fighting for it.
-void ownHeavyCannon(ProviderContainer container, {required bool equip}) {
-  final inventory = container.read(inventoryControllerProvider.notifier);
-  inventory.collect(WeaponCatalog.heavyCannon.id);
-  if (equip) inventory.equipWeapon(WeaponCatalog.heavyCannon.id);
-}
-
 void main() {
-  test('different weapon usage leads to different Warden setups', () {
-    final blasterPlayer = newContainer();
-    playBattle(blasterPlayer);
-
-    final heavyPlayer = newContainer();
-    ownHeavyCannon(heavyPlayer, equip: true);
-    playBattle(heavyPlayer);
-
-    final blasterWarden = blasterPlayer
-        .read(battleSessionProvider(_warden))
-        .state
-        .boss
-        .modifiers;
-    final heavyWarden = heavyPlayer
-        .read(battleSessionProvider(_warden))
-        .state
-        .boss
-        .modifiers;
-
-    expect(blasterWarden.damageMultipliers, {WeaponType.blaster: 0.7});
-    expect(heavyWarden.damageMultipliers, {WeaponType.heavyCannon: 0.6});
-  });
-
-  test('owning a weapon without using it is never countered', () {
+  test('a Sentinel battle unlocks the Mk II, reinforced where the player hit, '
+      'and the Blaster can still beat it', () {
     final container = newContainer();
-    ownHeavyCannon(container, equip: false);
+    expect(
+      container.read(progressControllerProvider).isBossUnlocked(_mk2),
+      isFalse,
+    );
 
     playBattle(container);
+    expect(
+      container.read(progressControllerProvider).isBossUnlocked(_mk2),
+      isTrue,
+    );
 
-    final modifiers = container
-        .read(battleSessionProvider(_warden))
-        .state
-        .boss
-        .modifiers;
-    expect(modifiers.damageMultiplierFor(WeaponType.heavyCannon), 1);
+    final (:session, :events) = playBattle(
+      container,
+      bossId: _mk2,
+      targetOrder: _mk2Order,
+    );
+
+    final boss = session.state.boss;
+    expect(boss.definition.name, 'Sentinel Mk II');
+    expect(
+      boss.modifiers.reinforcement?.zone,
+      BossZone.center,
+      reason: 'every Sentinel shot went to its center',
+    );
+    expect(boss.modifiers.damageMultipliers, isEmpty);
+    expect(boss.modifiers.coreWindowOpenDuration, isNull);
+    expect(boss.component('sentinel_mk2.armor')!.maxIntegrity, 150);
+    expect(
+      container.read(battleHudProvider(_mk2)).reinforcedZone,
+      BossZone.center,
+    );
+    final destroyed = [
+      for (final e in events.whereType<BossComponentDestroyed>()) e.componentId,
+    ];
+    expect(
+      destroyed.indexOf('boss.sentinel_mk2.reinforcement_center'),
+      lessThan(destroyed.indexOf('sentinel_mk2.armor')),
+    );
+    expect(session.state.outcome, BattleOutcome.victory);
+    expect(container.read(progressControllerProvider).battlesFought, 2);
   });
 
-  test('without transmitted intel the Warden does not adapt', () {
+  test('without transmitted intel the Mk II keeps its default armor', () {
     final container = newContainer();
 
     playBattle(container, shootObserver: true);
 
     final modifiers = container
-        .read(battleSessionProvider(_warden))
+        .read(battleSessionProvider(_mk2))
         .state
         .boss
         .modifiers;
@@ -94,69 +89,13 @@ void main() {
     expect(sentinel.modifiers.isAdapted, isFalse);
   });
 
-  test(
-    'a Sentinel battle unlocks the Warden, which a countered Blaster can still beat',
-    () {
-      final container = newContainer();
-      expect(
-        container.read(progressControllerProvider).isBossUnlocked(_warden),
-        isFalse,
-      );
+  test('a Mk II rematch learns from the Sentinel, not from the Mk II', () {
+    final container = newContainer();
+    playBattle(container);
+    playBattle(container, bossId: _mk2, targetOrder: _mk2Order);
 
-      playBattle(container);
-      expect(
-        container.read(progressControllerProvider).isBossUnlocked(_warden),
-        isTrue,
-      );
-
-      final (:session, :events) = playBattle(
-        container,
-        bossId: _warden,
-        targetOrder: _wardenOrder,
-      );
-
-      expect(events.whereType<CoreShieldDropped>(), hasLength(2));
-      expect(
-        events.whereType<BossComponentHit>().any((e) => e.resisted),
-        isTrue,
-      );
-      expect(session.state.boss.definition.id, _warden);
-      final destroyed = [
-        for (final e in events.whereType<BossComponentDestroyed>())
-          e.componentId,
-      ];
-      for (final side in ['left', 'right']) {
-        expect(
-          destroyed.indexOf('warden.housing_$side'),
-          lessThan(destroyed.indexOf('warden.cannon_$side')),
-          reason: 'the $side cannon is only reachable through its housing',
-        );
-      }
-      expect(
-        session.state.boss.modifiers.reinforcement?.zone,
-        BossZone.center,
-        reason: 'every Sentinel shot went to its center',
-      );
-      expect(
-        destroyed.indexOf('boss.warden.reinforcement_center'),
-        lessThan(destroyed.indexOf('warden.plate')),
-      );
-      expect(session.state.boss.component('warden.plate')!.maxIntegrity, 150);
-      expect(
-        container.read(battleHudProvider(_warden)).reinforcedZone,
-        BossZone.center,
-      );
-      expect(
-        session.state.record.stats.zoneDamage.keys,
-        containsAll([BossZone.left, BossZone.center, BossZone.right]),
-      );
-      expect(
-        session.state.boss.modifiers.damageMultiplierFor(WeaponType.blaster),
-        0.7,
-        reason: 'the Warden countered the Blaster',
-      );
-      expect(session.state.outcome, BattleOutcome.victory);
-      expect(container.read(progressControllerProvider).battlesFought, 2);
-    },
-  );
+    final intel = container.read(bossIntelControllerProvider);
+    expect(intel.reports.map((r) => r.bossId), [BossCatalog.sentinel.id, _mk2]);
+    expect(container.read(bossEvolutionProvider(_mk2)).basedOnReport, 1);
+  });
 }

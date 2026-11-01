@@ -14,11 +14,11 @@ void main() {
   test('the top HUD shows the boss as one total integrity bar', () {
     final battle = BattleState(
       ship: ShipState(arena: arena, weapon: WeaponCatalog.blaster),
-      boss: BossState(definition: BossCatalog.warden, arena: arena),
+      boss: BossState(definition: BossCatalog.sentinelMk2, arena: arena),
     )..start();
 
     final fresh = BattleHudState.fromBattle(battle);
-    expect(fresh.bossMaxIntegrity, 860);
+    expect(fresh.bossMaxIntegrity, 740);
     expect(fresh.bossIntegrityRatio, 1);
 
     final shot = battle
@@ -27,10 +27,10 @@ void main() {
         .single;
     battle.resolveHit(
       projectileId: shot.projectileId,
-      componentId: 'warden.cannon_left',
+      componentId: 'sentinel_mk2.hull_left',
     );
 
     final hit = BattleHudState.fromBattle(battle);
-    expect(hit.bossIntegrity, 850);
+    expect(hit.bossIntegrity, 730);
   });
 }

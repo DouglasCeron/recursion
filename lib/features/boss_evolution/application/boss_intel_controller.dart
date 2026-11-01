@@ -13,9 +13,13 @@ final initialBossIntelProvider = Provider<BossIntel>(
 final bossIntelControllerProvider =
     NotifierProvider<BossIntelController, BossIntel>(BossIntelController.new);
 
-/// Configuration the adaptive boss will use, derived only from enemy intel.
-final bossEvolutionProvider = Provider<BossEvolutionState>(
-  (ref) => AdaptationRules.evolve(ref.watch(bossIntelControllerProvider)),
+/// Configuration the boss with the given id will use, derived only from
+/// enemy intel.
+final bossEvolutionProvider = Provider.family<BossEvolutionState, String>(
+  (ref, bossId) => AdaptationRules.evolve(
+    ref.watch(bossIntelControllerProvider),
+    bossId: bossId,
+  ),
 );
 
 /// Receives observer transmissions and keeps the enemy faction's knowledge.
@@ -23,8 +27,11 @@ class BossIntelController extends Notifier<BossIntel> {
   @override
   BossIntel build() => ref.read(initialBossIntelProvider);
 
-  void receiveTransmission(CombatStats observed) {
-    state = state.withReport(WeaponExposureProfile.fromStats(observed));
+  void receiveTransmission(CombatStats observed, {required String bossId}) {
+    state = state.withReport(
+      WeaponExposureProfile.fromStats(observed),
+      bossId: bossId,
+    );
   }
 
   void reset() => state = const BossIntel();

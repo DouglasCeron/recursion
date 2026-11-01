@@ -1,14 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/core/geometry/arena_bounds.dart';
-import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/boss_modifiers.dart';
 import 'package:recursion/features/combat/domain/entities/boss_state.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
+import '../../support/shielded_boss.dart';
+
 void main() {
   const arena = ArenaBounds.standard;
-  const warden = BossCatalog.warden;
+  const warden = shieldedBoss;
   const coreId = 'warden.core';
   const plateId = 'warden.plate';
   const leftId = 'warden.cannon_left';

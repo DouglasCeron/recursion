@@ -12,10 +12,12 @@ import 'package:recursion/features/ship/domain/ship_state.dart';
 import 'package:recursion/features/ship/domain/weapon_catalog.dart';
 import 'package:recursion/features/ship/domain/weapon_definition.dart';
 
+import '../../support/shielded_boss.dart';
+
 const arena = ArenaBounds.standard;
 
-BossState reinforcedWarden(BossZone zone) => BossState(
-  definition: BossCatalog.warden,
+BossState reinforcedMk2(BossZone zone) => BossState(
+  definition: BossCatalog.sentinelMk2,
   arena: arena,
   modifiers: BossModifiers(
     reinforcement: ZoneReinforcement(
@@ -41,40 +43,50 @@ String absorberOf(BossState boss, String id) => boss
 void main() {
   group('a reinforced zone', () {
     test('has stronger structures but the same core', () {
-      final boss = reinforcedWarden(BossZone.center);
+      final boss = reinforcedMk2(BossZone.center);
 
-      expect(boss.component('warden.plate')!.maxIntegrity, 150);
-      expect(boss.component('warden.core')!.maxIntegrity, 360);
-      expect(boss.component('warden.cannon_left')!.maxIntegrity, 120);
-      expect(boss.definition.component('warden.plate').reinforced, isTrue);
-      expect(boss.definition.component('warden.core').reinforced, isFalse);
+      expect(boss.component('sentinel_mk2.armor')!.maxIntegrity, 150);
+      expect(boss.component('sentinel_mk2.cannon')!.maxIntegrity, 150);
+      expect(boss.component('sentinel_mk2.core')!.maxIntegrity, 400);
+      expect(boss.component('sentinel_mk2.hull_left')!.maxIntegrity, 70);
+      expect(
+        boss.definition.component('sentinel_mk2.armor').reinforced,
+        isTrue,
+      );
+      expect(
+        boss.definition.component('sentinel_mk2.core').reinforced,
+        isFalse,
+      );
     });
 
     test('gets an extra plate in front of its outer layer', () {
-      final boss = reinforcedWarden(BossZone.center);
-      const plateId = 'boss.warden.reinforcement_center';
+      final boss = reinforcedMk2(BossZone.center);
+      const plateId = 'boss.sentinel_mk2.reinforcement_center';
 
       final plate = boss.definition.component(plateId);
       expect(plate.kind, BossComponentKind.armor);
       expect(plate.zone, BossZone.center);
       expect(boss.component(plateId)!.maxIntegrity, 80);
-      expect(boss.isCovered('warden.plate'), isTrue);
-      expect(absorberOf(boss, 'warden.core'), plateId);
+      expect(boss.isCovered('sentinel_mk2.armor'), isTrue);
+      expect(boss.isCovered('sentinel_mk2.cannon'), isTrue);
+      expect(absorberOf(boss, 'sentinel_mk2.core'), plateId);
     });
 
     test('works on the side zones too', () {
-      final boss = reinforcedWarden(BossZone.left);
-      const plateId = 'boss.warden.reinforcement_left';
+      final boss = reinforcedMk2(BossZone.left);
+      const plateId = 'boss.sentinel_mk2.reinforcement_left';
 
-      expect(boss.component('warden.housing_left')!.maxIntegrity, 120);
-      expect(boss.component('warden.cannon_left')!.maxIntegrity, 180);
-      expect(boss.component('warden.housing_right')!.maxIntegrity, 80);
-      expect(absorberOf(boss, 'warden.cannon_left'), plateId);
-      expect(absorberOf(boss, 'warden.cannon_right'), 'warden.housing_right');
+      expect(boss.component('sentinel_mk2.hull_left')!.maxIntegrity, 105);
+      expect(boss.component('sentinel_mk2.hull_right')!.maxIntegrity, 70);
+      expect(absorberOf(boss, 'sentinel_mk2.hull_left'), plateId);
+      expect(
+        absorberOf(boss, 'sentinel_mk2.hull_right'),
+        'sentinel_mk2.hull_right',
+      );
     });
 
     test('keeps its plate inside the zone, below every part of it', () {
-      for (final boss in BossCatalog.all) {
+      for (final boss in [...BossCatalog.all, shieldedBoss]) {
         for (final zone in BossZone.values) {
           final reinforcement = ZoneReinforcement(
             zone: zone,
@@ -97,9 +109,9 @@ void main() {
     });
 
     test('leaves the catalog boss untouched without a reinforcement', () {
-      final boss = BossState(definition: BossCatalog.warden, arena: arena);
+      final boss = BossState(definition: BossCatalog.sentinelMk2, arena: arena);
 
-      expect(boss.definition, same(BossCatalog.warden));
+      expect(boss.definition, same(BossCatalog.sentinelMk2));
     });
   });
 
@@ -107,7 +119,7 @@ void main() {
     test('is logged by the zone of the part that took the hit', () {
       final battle = BattleState(
         ship: ShipState(arena: arena, weapon: WeaponCatalog.blaster),
-        boss: BossState(definition: BossCatalog.warden, arena: arena),
+        boss: BossState(definition: BossCatalog.sentinelMk2, arena: arena),
       )..start();
 
       int fire() => battle
@@ -118,9 +130,9 @@ void main() {
 
       battle.resolveHit(
         projectileId: fire(),
-        componentId: 'warden.cannon_left',
+        componentId: 'sentinel_mk2.hull_left',
       );
-      battle.resolveHit(projectileId: fire(), componentId: 'warden.core');
+      battle.resolveHit(projectileId: fire(), componentId: 'sentinel_mk2.core');
       battle.resolveObserverHit(projectileId: fire());
 
       final zones = battle.record.stats.zoneDamage;
