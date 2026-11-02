@@ -70,8 +70,6 @@ class BattleHudState {
     required this.hull,
     required this.maxHull,
     required this.bossName,
-    required this.bossIntegrity,
-    required this.bossMaxIntegrity,
     required this.bossPattern,
     required this.coreVulnerable,
     required this.escapeTimeLeft,
@@ -98,8 +96,6 @@ class BattleHudState {
       hull: battle.ship.hull,
       maxHull: battle.ship.maxHull,
       bossName: boss.definition.name,
-      bossIntegrity: boss.totalIntegrity,
-      bossMaxIntegrity: boss.totalMaxIntegrity,
       bossPattern: boss.attackPattern,
       coreVulnerable: boss.isCoreVulnerable,
       escapeTimeLeft: boss.phase == BossPhase.escaping
@@ -136,10 +132,6 @@ class BattleHudState {
   final int maxHull;
   final String bossName;
 
-  /// Sum of every part, shown as one bar; each part has its own bar in the
-  /// arena.
-  final int bossIntegrity;
-  final int bossMaxIntegrity;
   final BossAttackPattern bossPattern;
   final bool coreVulnerable;
 
@@ -164,7 +156,6 @@ class BattleHudState {
   final List<String> evolutions;
 
   double get hullRatio => hull / maxHull;
-  double get bossIntegrityRatio => bossIntegrity / bossMaxIntegrity;
 
   static String _itemName(String itemId) =>
       WeaponCatalog.byId(itemId)?.name ?? itemId;

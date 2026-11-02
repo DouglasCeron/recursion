@@ -8,6 +8,7 @@ import 'package:flutter/animation.dart';
 import '../../domain/entities/boss_component_state.dart';
 import '../../domain/entities/boss_definition.dart';
 import '../../domain/entities/boss_state.dart';
+import 'damage_palette.dart';
 
 /// Visual container for a boss; mirrors [BossState] position and phase.
 ///
@@ -104,21 +105,20 @@ class BossPartComponent extends PositionComponent {
   String get componentId => definition.id;
 
   static final _destroyedPaint = Paint()..color = const Color(0xFF3A3F4B);
-  static final _cannonPaint = Paint()..color = const Color(0xFFB0B7C6);
-  static final _armorPaint = Paint()..color = const Color(0xFF8C5A3C);
-  static final _hullPaint = Paint()..color = const Color(0xFF56627A);
+  static const _cannonColor = Color(0xFFB0B7C6);
+  static const _armorColor = Color(0xFF8C5A3C);
+  static const _hullColor = Color(0xFF56627A);
   static final _hullSeamPaint = Paint()
     ..color = const Color(0xFF3A4458)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5;
   static final _coveredShadePaint = Paint()..color = const Color(0x99000000);
-  static final _barBackPaint = Paint()..color = const Color(0x88000000);
-  static final _barPaint = Paint()..color = const Color(0xFF7CFFB2);
-  static final _coveredBarPaint = Paint()..color = const Color(0x99FFFFFF);
-
-  static const _barHeight = 3.0;
-  static const _barGap = 3.0;
-  static const _minBarWidth = 24.0;
+  static final _crackPaint = Paint()
+    ..color = const Color(0xDD111111)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
   static final _coreClosedPaint = Paint()..color = const Color(0xFF7A1E2C);
   static final _coreOpenPaint = Paint()..color = const Color(0xFFFF4D6D);
   static final _coreGlowPaint = Paint()
@@ -149,6 +149,14 @@ class BossPartComponent extends PositionComponent {
         : RectangleHitbox(collisionType: CollisionType.passive);
     add(_hitbox);
   }
+
+  final _fillPaint = Paint();
+
+  double get _damage =>
+      DamagePalette.damageOf(state.integrity, state.maxIntegrity);
+
+  Paint _fill(Color base) =>
+      _fillPaint..color = DamagePalette.fillFor(base, _damage);
 
   void markDestroyed() {
     _hitbox.collisionType = CollisionType.inactive;
@@ -183,15 +191,16 @@ class BossPartComponent extends PositionComponent {
       case BossComponentKind.armor:
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-          _armorPaint,
+          _fill(_armorColor),
         );
       case BossComponentKind.hull:
         final hull = RRect.fromRectAndRadius(rect, const Radius.circular(2));
-        canvas.drawRRect(hull, _hullPaint);
+        canvas.drawRRect(hull, _fill(_hullColor));
         canvas.drawRRect(hull.deflate(3), _hullSeamPaint);
       case BossComponentKind.cannon:
-        canvas.drawRect(rect, _cannonPaint);
+        canvas.drawRect(rect, _fill(_cannonColor));
     }
+    _renderCracks(canvas, rect);
     if (boss.isCovered(definition.id)) {
       final shade = rect.inflate(1);
       definition.kind == BossComponentKind.core
@@ -202,7 +211,6 @@ class BossPartComponent extends PositionComponent {
             )
           : canvas.drawRect(shade, _coveredShadePaint);
     }
-    _renderIntegrityBar(canvas, rect);
     // One inner line per armor level above 1.
     for (var level = 2; level <= definition.armorLevel; level++) {
       final inner = rect.deflate(2 * (level - 1));
@@ -221,23 +229,20 @@ class BossPartComponent extends PositionComponent {
     }
   }
 
-  /// A thin integrity bar just above the part; grey while it is covered.
-  void _renderIntegrityBar(Canvas canvas, Rect rect) {
-    final width = rect.width < _minBarWidth ? _minBarWidth : rect.width;
-    final back = Rect.fromCenter(
-      center: Offset(rect.center.dx, rect.top - _barGap - _barHeight / 2),
-      width: width,
-      height: _barHeight,
-    );
-    canvas.drawRect(back, _barBackPaint);
-    canvas.drawRect(
-      Rect.fromLTWH(
-        back.left,
-        back.top,
-        back.width * state.integrity / state.maxIntegrity,
-        back.height,
-      ),
-      boss.isCovered(definition.id) ? _coveredBarPaint : _barPaint,
-    );
+  /// The core stays out of the color scale (its red means "exposed"), so it
+  /// shows damage through cracks only, kept inside its circle.
+  void _renderCracks(Canvas canvas, Rect rect) {
+    final count = DamagePalette.cracksFor(_damage);
+    if (count == 0) return;
+    final area = definition.kind == BossComponentKind.core
+        ? rect.deflate(rect.shortestSide * 0.2)
+        : rect;
+    for (final crack in DamagePalette.cracksIn(
+      area,
+      count,
+      definition.id.hashCode,
+    )) {
+      canvas.drawPath(Path()..addPolygon(crack, false), _crackPaint);
+    }
   }
 }

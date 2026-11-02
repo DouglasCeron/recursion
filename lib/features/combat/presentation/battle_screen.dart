@@ -80,13 +80,6 @@ class _BattleHud extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            LinearProgressIndicator(
-              value: hud.bossIntegrityRatio,
-              minHeight: 4,
-              color: const Color(0xFF7CFFB2),
-              backgroundColor: Colors.white24,
-            ),
             if (_adaptations(hud) case final adaptations?) ...[
               const SizedBox(height: 4),
               Text(

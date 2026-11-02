@@ -28,7 +28,7 @@ After the proof of concept:
 | 10 | Battle HUD that scales with many boss parts | Done |
 | 11 | Boss 2 becomes the Sentinel Mk II, evolved from the Sentinel's damage history | Done |
 | 12 | Endless boss lineage: each boss evolves from the previous one (armor levels, extra plates) | Done |
-| 13 | Damage shown as part colors instead of integrity bars | Planned |
+| 13 | Damage shown as part colors and cracks instead of integrity bars | Done |
 | 14 | Weapon mutations: extra cannons where the boss lost one | Planned |
 | 15 | Enemy laser and missile as evolutions after two cannons | Planned |
 | 16 | Richer observer (ship position, destruction order) | Planned |
@@ -141,7 +141,7 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
   covers are gone, the inner part takes hits normally.
 - This rule lives in the domain, so it does not depend on which hitbox Flame
   reports first.
-- Covered parts are drawn darker and their integrity bar is grey. Outer layers
+- Covered parts are drawn darker. Outer layers
   are drawn on top of what they cover.
 - Hull (`BossComponentKind.hull`) is plain outer plating: it protects, never
   attacks and never drops anything.
@@ -150,11 +150,15 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 
 ### Battle HUD
 
-- The top of the screen shows only the boss name, its pattern, one bar with
-  the total integrity of every part, and the evolutions it carries.
-- Each part has its own thin integrity bar drawn in the arena, just above it;
-  it disappears when the part is destroyed. This scales with any number of
-  parts.
+- The top of the screen shows only the boss name, its pattern and the
+  evolutions it carries. There are no integrity bars for the boss.
+- Each part shows its damage in the arena instead
+  (`presentation/flame/damage_palette.dart`): its fill shifts smoothly from
+  its own color to yellow (25% damage), orange (50%), red (75%) and dark red
+  (destroyed soon). One crack appears at 50% damage and three at 75%, so the
+  cue does not rely on color alone. This scales with any number of parts.
+- The core stays out of the color scale, because its bright red means
+  "exposed"; it shows damage through the cracks only.
 - Banners (shield down, escape countdown, core exposed, drop to grab) sit at
   the bottom, above the ship hull bar, so they never cover the boss.
 
@@ -296,8 +300,8 @@ restart.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.
-- Part integrity bars sit just above each part, so a bar can overlap the part
-  right above it (e.g. the armor bar touches the core).
+- Damage is shown by color and cracks only, so exact integrity values are
+  not visible during a battle.
 
 ## Tests
 

@@ -136,11 +136,6 @@ class BossState {
     return (_x + part.offsetX, y + part.offsetY);
   }
 
-  int get totalIntegrity =>
-      _components.values.fold(0, (sum, c) => sum + c.integrity);
-  int get totalMaxIntegrity =>
-      _components.values.fold(0, (sum, c) => sum + c.maxIntegrity);
-
   BossComponentState get core =>
       _components.values.firstWhere((c) => c.kind == BossComponentKind.core);
 
