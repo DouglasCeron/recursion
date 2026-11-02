@@ -305,13 +305,13 @@ void main() {
       expect(duplicate, isEmpty);
     });
 
-    test('is destroyed once and then lets projectiles pass', () {
+    test('flees once and then lets projectiles pass', () {
       final battle = newBattle(weapon: breaker);
 
       final events = battle.resolveObserverHit(projectileId: fireOnce(battle));
       final next = fireOnce(battle);
 
-      expect(events.whereType<ObserverDestroyed>(), hasLength(1));
+      expect(events.whereType<ObserverFled>(), hasLength(1));
       expect(battle.resolveObserverHit(projectileId: next), isEmpty);
       expect(battle.isProjectileInFlight(next), isTrue);
     });
@@ -335,7 +335,20 @@ void main() {
       expect(events.last, isA<BattleCompleted>());
     });
 
-    test('a destroyed observer transmits nothing', () {
+    test('a hit it survives moves it, and the event says where', () {
+      final battle = newBattle();
+      final (x, y) = (battle.observer.x, battle.observer.y);
+
+      final hit = battle
+          .resolveObserverHit(projectileId: fireOnce(battle))
+          .whereType<ObserverHit>()
+          .single;
+
+      expect((hit.x, hit.y), (battle.observer.x, battle.observer.y));
+      expect((hit.x, hit.y), isNot((x, y)));
+    });
+
+    test('an observer that fled transmits only what it saw before', () {
       final battle = newBattle(weapon: breaker);
       battle.resolveObserverHit(projectileId: fireOnce(battle));
       battle.resolveHit(projectileId: fireOnce(battle), componentId: armorId);
@@ -345,8 +358,10 @@ void main() {
         componentId: coreId,
       );
 
-      expect(events.whereType<ObserverTransmitted>(), isEmpty);
-      expect(battle.intelTransmitted, isFalse);
+      final stats = events.whereType<ObserverTransmitted>().single.stats;
+      expect(stats.weapons[WeaponType.heavyCannon]!.shots, 1);
+      expect(stats.zoneDamage, isEmpty);
+      expect(battle.intelTransmitted, isTrue);
     });
 
     test('transmits on defeat and escape too', () {
@@ -364,7 +379,7 @@ void main() {
   });
 
   group('battle record', () {
-    test('reflects real usage even when the observer is destroyed', () {
+    test('reflects real usage even when the observer fled', () {
       final battle = newBattle(weapon: breaker);
       battle.resolveObserverHit(projectileId: fireOnce(battle));
       fireOnce(battle);
@@ -374,8 +389,8 @@ void main() {
       final record = battle.record;
 
       expect(record.outcome, BattleOutcome.victory);
-      expect(record.observerDestroyed, isTrue);
-      expect(record.intelTransmitted, isFalse);
+      expect(record.observerFled, isTrue);
+      expect(record.intelTransmitted, isTrue);
       final usage = record.stats.weapons[WeaponType.heavyCannon]!;
       expect(usage.shots, battle.shotsFired);
       expect(usage.hits, 3);

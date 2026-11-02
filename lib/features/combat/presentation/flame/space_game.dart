@@ -52,11 +52,7 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
     );
     _ship = PlayerShipComponent(ship: session.state.ship);
     _boss = BossComponent(boss: session.state.boss);
-    _observer = ObserverComponent(
-      observer: session.state.observer,
-      position: Vector2(36, arena.height * 0.45),
-      hoverRange: arena.height * 0.12,
-    );
+    _observer = ObserverComponent(observer: session.state.observer);
     world.addAll([_ship, _boss, _observer]);
 
     _subscription = session.events.listen(_onBattleEvent);
@@ -113,8 +109,8 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
         _boss.flyAway();
       case ShipDestroyed():
         _ship.explode();
-      case ObserverDestroyed():
-        _observer.explode();
+      case ObserverFled():
+        _observer.flee();
       case BattleCompleted():
         _clearProjectiles();
       case BattleStarted() ||

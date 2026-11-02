@@ -4,27 +4,30 @@ import 'dart:ui';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
+import 'package:flutter/animation.dart';
 
 import '../../domain/entities/observer_drone.dart';
 
 /// Visual representation of the enemy observer drone; mirrors
-/// [ObserverDrone]. It hovers along the left edge, away from the boss, so
-/// shooting it means leaving the boss's line of fire.
+/// [ObserverDrone]. It dashes to the spot the domain picks after each hit
+/// and flies off the nearest side edge when it flees.
 ///
-/// The vertical hover is purely cosmetic and does not affect any rule.
+/// The small vertical hover is purely cosmetic and does not affect any rule.
 class ObserverComponent extends PositionComponent {
-  ObserverComponent({
-    required this.observer,
-    required Vector2 position,
-    required this.hoverRange,
-  }) : _anchorY = position.y,
-       super(position: position, size: Vector2(28, 28), anchor: Anchor.center);
+  ObserverComponent({required this.observer})
+    : super(
+        position: Vector2(observer.x, observer.y),
+        size: Vector2(28, 28),
+        anchor: Anchor.center,
+      );
 
   final ObserverDrone observer;
-  final double hoverRange;
-  final double _anchorY;
   double _time = 0;
-  bool _exploding = false;
+  bool _fleeing = false;
+
+  /// Arena units per second while dashing to a new spot.
+  static const _dashSpeed = 900.0;
+  static const _hoverRange = 8.0;
 
   static final _bodyPaint = Paint()..color = const Color(0xFF9575CD);
   static final _eyePaint = Paint()..color = const Color(0xFF1A1033);
@@ -40,9 +43,19 @@ class ObserverComponent extends PositionComponent {
   @override
   void update(double dt) {
     super.update(dt);
-    if (_exploding) return;
+    if (_fleeing) return;
     _time += dt;
-    position.y = _anchorY + math.sin(_time * 0.7) * hoverRange;
+    final target = Vector2(
+      observer.x,
+      observer.y + math.sin(_time * 0.7) * _hoverRange,
+    );
+    final step = _dashSpeed * dt;
+    final offset = target - position;
+    if (offset.length <= step) {
+      position.setFrom(target);
+    } else {
+      position.add(offset.normalized()..scale(step));
+    }
   }
 
   @override
@@ -70,16 +83,17 @@ class ObserverComponent extends PositionComponent {
     );
   }
 
-  void explode() {
-    if (_exploding) return;
-    _exploding = true;
+  void flee() {
+    if (_fleeing) return;
+    _fleeing = true;
     children.whereType<ShapeHitbox>().forEach(
       (hitbox) => hitbox.collisionType = CollisionType.inactive,
     );
+    final towardsLeft = observer.x < observer.arena.width / 2;
     add(
-      ScaleEffect.to(
-        Vector2.zero(),
-        EffectController(duration: 0.35),
+      MoveEffect.by(
+        Vector2(towardsLeft ? -120 : 120, -40),
+        EffectController(duration: 0.5, curve: Curves.easeIn),
         onComplete: removeFromParent,
       ),
     );

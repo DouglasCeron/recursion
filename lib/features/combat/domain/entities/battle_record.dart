@@ -11,7 +11,7 @@ class BattleRecord {
     required this.stats,
     required this.destroyedComponentIds,
     required this.collectedItemIds,
-    required this.observerDestroyed,
+    required this.observerFled,
     required this.intelTransmitted,
   });
 
@@ -21,6 +21,6 @@ class BattleRecord {
   final CombatStats stats;
   final List<String> destroyedComponentIds;
   final List<String> collectedItemIds;
-  final bool observerDestroyed;
+  final bool observerFled;
   final bool intelTransmitted;
 }

@@ -77,6 +77,7 @@ class BattleHudState {
     required this.collectedItems,
     required this.lostItems,
     required this.intelTransmitted,
+    required this.observerFled,
     required this.hasCoreShield,
     required this.coreShielded,
     required this.shieldBreakTimeLeft,
@@ -113,6 +114,7 @@ class BattleHudState {
           if (drop.status == DropStatus.expired) _itemName(drop.itemId),
       ],
       intelTransmitted: battle.intelTransmitted,
+      observerFled: battle.observer.hasFled,
       hasCoreShield: boss.definition.hasCoreShield,
       coreShielded: boss.isCoreShielded,
       shieldBreakTimeLeft: boss.shieldBreakTimeLeft,
@@ -143,6 +145,9 @@ class BattleHudState {
   final List<String> collectedItems;
   final List<String> lostItems;
   final bool intelTransmitted;
+
+  /// The observer left early, so it only saw part of the battle.
+  final bool observerFled;
   final bool hasCoreShield;
   final bool coreShielded;
   final double shieldBreakTimeLeft;

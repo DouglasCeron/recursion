@@ -23,7 +23,7 @@ class BattleState {
     required this.boss,
     ObserverDrone? observer,
     this.dropLifetime = defaultDropLifetime,
-  }) : observer = observer ?? ObserverDrone();
+  }) : observer = observer ?? ObserverDrone(arena: boss.arena);
 
   /// Seconds a drop stays on the battlefield before it is lost.
   static const defaultDropLifetime = 8.0;
@@ -76,7 +76,7 @@ class BattleState {
         if (c.isDestroyed) c.id,
     ],
     collectedItemIds: collectedItemIds,
-    observerDestroyed: observer.isDestroyed,
+    observerFled: observer.hasFled,
     intelTransmitted: _intelTransmitted,
   );
 
@@ -186,9 +186,9 @@ class BattleState {
   }
 
   /// Resolves a player projectile hitting the observer drone. The projectile
-  /// stays in flight if the drone is already destroyed.
+  /// stays in flight if the drone has already fled.
   List<BattleEvent> resolveObserverHit({required int projectileId}) {
-    if (_status != BattleStatus.inProgress || observer.isDestroyed) {
+    if (_status != BattleStatus.inProgress || observer.hasFled) {
       return const [];
     }
     final weapon = _playerProjectiles.remove(projectileId);
@@ -203,8 +203,10 @@ class BattleState {
         projectileId: projectileId,
         damage: outcome.damageApplied,
         remainingIntegrity: outcome.remainingIntegrity,
+        x: observer.x,
+        y: observer.y,
       ),
-      if (outcome.destroyedNow) const ObserverDestroyed(),
+      if (outcome.destroyedNow) const ObserverFled(),
     ];
   }
 
@@ -284,8 +286,8 @@ class BattleState {
     );
   }
 
-  /// Ends the battle. Drops that were not collected are lost, and a surviving
-  /// observer transmits what it recorded.
+  /// Ends the battle. Drops that were not collected are lost, and the
+  /// observer transmits what it recorded, even if it fled.
   void _complete(BattleOutcome outcome, List<BattleEvent> events) {
     _status = BattleStatus.completed;
     _outcome = outcome;

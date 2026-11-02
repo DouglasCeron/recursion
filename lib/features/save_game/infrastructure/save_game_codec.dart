@@ -32,7 +32,7 @@ class SaveGameCodec {
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 5;
+  static const currentVersion = 6;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
@@ -41,7 +41,22 @@ class SaveGameCodec {
     2: _addZoneDamage,
     3: _addReportBoss,
     4: _addLineage,
+    5: _renameObserverDestroyed,
   };
+
+  /// v6: the observer flees instead of being destroyed, and still transmits
+  /// what it saw. Older records keep their value under the new name.
+  static JsonMap _renameObserverDestroyed(JsonMap document) {
+    final progress = document['progress'] as JsonMap;
+    final lastBattle = progress['lastBattle'] as JsonMap?;
+    if (lastBattle == null) return document;
+    final record = {...lastBattle};
+    record['observerFled'] = record.remove('observerDestroyed');
+    return {
+      ...document,
+      'progress': {...progress, 'lastBattle': record},
+    };
+  }
 
   static const _mk2Id = 'boss.sentinel_mk2';
   static const _secondGenerationId = 'boss.sentinel.gen2';
@@ -275,7 +290,7 @@ class SaveGameCodec {
     },
     'destroyedComponentIds': record.destroyedComponentIds,
     'collectedItemIds': record.collectedItemIds,
-    'observerDestroyed': record.observerDestroyed,
+    'observerFled': record.observerFled,
     'intelTransmitted': record.intelTransmitted,
   };
 
@@ -418,7 +433,7 @@ class SaveGameCodec {
         _strings(json['destroyedComponentIds']),
       ),
       collectedItemIds: List.unmodifiable(_strings(json['collectedItemIds'])),
-      observerDestroyed: json['observerDestroyed'] as bool,
+      observerFled: json['observerFled'] as bool,
       intelTransmitted: json['intelTransmitted'] as bool,
     );
   }

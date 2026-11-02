@@ -47,7 +47,7 @@ SaveGame sampleGame() {
         stats: stats,
         destroyedComponentIds: const ['sentinel.cannon', 'sentinel.core'],
         collectedItemIds: [WeaponCatalog.heavyCannon.id],
-        observerDestroyed: false,
+        observerFled: false,
         intelTransmitted: true,
       ),
     ),
@@ -237,12 +237,32 @@ void main() {
   });
 
   group('migrations', () {
-    /// The v4 document an earlier release would have written for [game]:
-    /// no lineage, and a fixed second boss.
+    /// The v5 document an earlier release would have written for [game]:
+    /// the observer could be destroyed instead of fleeing.
+    Map<String, Object?> v5DocumentOf(SaveGame game) {
+      final document = documentOf(game);
+      final lastBattle = (document['progress'] as Map)['lastBattle'] as Map?;
+      if (lastBattle != null) {
+        lastBattle['observerDestroyed'] = lastBattle.remove('observerFled');
+      }
+      return {...document, 'schemaVersion': 5};
+    }
+
+    /// The v4 document: v5 without a lineage, and a fixed second boss.
     Map<String, Object?> v4DocumentOf(SaveGame game) {
-      final document = documentOf(game)..remove('lineage');
+      final document = v5DocumentOf(game)..remove('lineage');
       return {...document, 'schemaVersion': 4};
     }
+
+    test('v5 records keep whether the observer was destroyed, as fled', () {
+      final lost = codec
+          .decode(jsonEncode(v5DocumentOf(sampleGame())))
+          .game
+          .progress
+          .lastBattle!;
+
+      expect(lost.observerFled, isFalse);
+    });
 
     /// The v3 document: v4 where reports do not know their boss.
     Map<String, Object?> v3DocumentOf(SaveGame game) {
@@ -377,7 +397,7 @@ void main() {
             stats: CombatStats.empty,
             destroyedComponentIds: const [],
             collectedItemIds: const [],
-            observerDestroyed: true,
+            observerFled: true,
             intelTransmitted: false,
           ),
         ),

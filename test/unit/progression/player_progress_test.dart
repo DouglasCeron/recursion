@@ -12,7 +12,7 @@ BattleRecord recordFor(String bossId, BattleOutcome outcome) => BattleRecord(
   stats: CombatStats.empty,
   destroyedComponentIds: const [],
   collectedItemIds: const [],
-  observerDestroyed: false,
+  observerFled: false,
   intelTransmitted: true,
 );
 

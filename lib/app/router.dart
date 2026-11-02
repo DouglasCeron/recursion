@@ -40,7 +40,12 @@ abstract final class AppRouter {
             arguments: id,
           ),
         ),
-        AppRoutes.battle => BattleScreen(bossId: bossId),
+        AppRoutes.battle => BattleScreen(
+          bossId: bossId,
+          onNextBoss: (id) => Navigator.of(
+            context,
+          ).pushReplacementNamed(AppRoutes.briefing, arguments: id),
+        ),
         AppRoutes.briefing => BriefingScreen(
           bossId: bossId,
           onLaunch: () => Navigator.of(

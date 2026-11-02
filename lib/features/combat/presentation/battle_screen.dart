@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../boss_evolution/application/boss_lineage_controller.dart';
 import '../domain/entities/battle_state.dart';
 import '../domain/entities/boss_state.dart';
 import '../domain/events/battle_event.dart';
@@ -9,9 +10,12 @@ import 'battle_providers.dart';
 import 'flame/space_game.dart';
 
 class BattleScreen extends ConsumerStatefulWidget {
-  const BattleScreen({required this.bossId, super.key});
+  const BattleScreen({required this.bossId, this.onNextBoss, super.key});
 
   final String bossId;
+
+  /// Opens the boss after [bossId] in the lineage. Offered after a victory.
+  final void Function(String nextBossId)? onNextBoss;
 
   @override
   ConsumerState<BattleScreen> createState() => _BattleScreenState();
@@ -27,6 +31,12 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
         ? _game!
         : _game = SpaceGame(session: session);
     final hud = ref.watch(battleHudProvider(widget.bossId));
+    final lineage = ref.watch(bossLineageControllerProvider);
+    final nextBossId = switch (lineage.numberOf(widget.bossId)) {
+      final n? when n < lineage.length => lineage.idOf(n + 1),
+      _ => null,
+    };
+    final onNextBoss = widget.onNextBoss;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -42,6 +52,13 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
               collectedItems: hud.collectedItems,
               lostItems: hud.lostItems,
               intelTransmitted: hud.intelTransmitted,
+              observerFled: hud.observerFled,
+              onNextBoss:
+                  hud.outcome == BattleOutcome.victory &&
+                      nextBossId != null &&
+                      onNextBoss != null
+                  ? () => onNextBoss(nextBossId)
+                  : null,
               onRestart: () =>
                   ref.invalidate(battleSessionProvider(widget.bossId)),
               onExit: () => Navigator.of(context).pop(),
@@ -185,16 +202,20 @@ class _BattleResult extends StatelessWidget {
     required this.collectedItems,
     required this.lostItems,
     required this.intelTransmitted,
+    required this.observerFled,
     required this.onRestart,
     required this.onExit,
+    this.onNextBoss,
   });
 
   final BattleOutcome outcome;
   final List<String> collectedItems;
   final List<String> lostItems;
   final bool intelTransmitted;
+  final bool observerFled;
   final VoidCallback onRestart;
   final VoidCallback onExit;
+  final VoidCallback? onNextBoss;
 
   @override
   Widget build(BuildContext context) {
@@ -226,18 +247,37 @@ class _BattleResult extends StatelessWidget {
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  intelTransmitted
-                      ? 'The observer sent intel on your weapons to the enemy.'
-                      : 'The observer was destroyed. No intel was sent.',
+                  switch ((intelTransmitted, observerFled)) {
+                    (false, _) => 'No intel was sent.',
+                    (true, true) =>
+                      'The observer fled early. It sent what it saw '
+                          'before leaving.',
+                    (true, false) =>
+                      'The observer sent intel on your weapons to the enemy.',
+                  },
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: intelTransmitted
+                    color: intelTransmitted && !observerFled
                         ? const Color(0xFFB39DDB)
                         : Colors.white54,
                   ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton(onPressed: onRestart, child: const Text('Retry')),
+                if (onNextBoss case final next?) ...[
+                  FilledButton(
+                    key: const Key('battle.next_boss'),
+                    onPressed: next,
+                    child: const Text('Next boss'),
+                  ),
+                  OutlinedButton(
+                    onPressed: onRestart,
+                    child: const Text('Retry'),
+                  ),
+                ] else
+                  FilledButton(
+                    onPressed: onRestart,
+                    child: const Text('Retry'),
+                  ),
                 TextButton(onPressed: onExit, child: const Text('Leave')),
               ],
             ),

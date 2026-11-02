@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/collisions.dart';
@@ -33,6 +34,7 @@ class BossComponent extends PositionComponent {
       _parts[definition.id] = part;
       add(part);
     }
+    add(_CriticalFlash(boss: boss));
   }
 
   @override
@@ -124,7 +126,6 @@ class BossPartComponent extends PositionComponent {
   static final _coreGlowPaint = Paint()
     ..color = const Color(0x66FF4D6D)
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-  static final _escapeTintPaint = Paint()..color = const Color(0x55FFD54F);
   static final _shieldPaint = Paint()
     ..color = const Color(0xAA4DD0E1)
     ..style = PaintingStyle.stroke
@@ -224,9 +225,6 @@ class BossPartComponent extends PositionComponent {
         definition.kind != BossComponentKind.core) {
       canvas.drawRect(rect.inflate(2), _adaptedPaint);
     }
-    if (boss.phase == BossPhase.escaping && (boss.escapeTimeLeft * 4) % 2 < 1) {
-      canvas.drawRect(rect, _escapeTintPaint);
-    }
   }
 
   /// The core stays out of the color scale (its red means "exposed"), so it
@@ -244,5 +242,38 @@ class BossPartComponent extends PositionComponent {
     )) {
       canvas.drawPath(Path()..addPolygon(crack, false), _crackPaint);
     }
+  }
+}
+
+/// While the boss announces its escape, one square frame blinks around the
+/// whole boss, not around each part.
+class _CriticalFlash extends PositionComponent {
+  _CriticalFlash({required this.boss})
+    : _bounds = _boundsOf(boss.definition),
+      super(priority: 10);
+
+  final BossState boss;
+  final Rect _bounds;
+
+  static const _padding = 8.0;
+  static final _fillPaint = Paint()..color = const Color(0x33FFD54F);
+  static final _framePaint = Paint()
+    ..color = const Color(0xFFFFD54F)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3;
+
+  static Rect _boundsOf(BossDefinition definition) => Rect.fromLTRB(
+    definition.components.map((c) => c.left).reduce(math.min),
+    definition.components.map((c) => c.top).reduce(math.min),
+    definition.components.map((c) => c.right).reduce(math.max),
+    definition.components.map((c) => c.bottom).reduce(math.max),
+  ).inflate(_padding);
+
+  @override
+  void render(Canvas canvas) {
+    if (boss.phase != BossPhase.escaping) return;
+    if ((boss.escapeTimeLeft * 4) % 2 >= 1) return;
+    canvas.drawRect(_bounds, _fillPaint);
+    canvas.drawRect(_bounds, _framePaint);
   }
 }

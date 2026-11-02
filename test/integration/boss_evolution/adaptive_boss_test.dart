@@ -79,7 +79,8 @@ void main() {
     expect(third.component('sentinel.hull_left').armorLevel, 1);
   });
 
-  test('without transmitted intel the next boss is born unchanged', () {
+  test('an observer that flees before seeing boss damage leaves the next '
+      'boss unchanged', () {
     final container = newContainer();
 
     playBattle(container, shootObserver: true);
@@ -87,7 +88,7 @@ void main() {
     final lineage = container.read(bossLineageControllerProvider);
     expect(lineage.length, 2);
     expect(lineage.generations.last.steps, isEmpty);
-    expect(lineage.generations.last.basedOnReport, isNull);
+    expect(lineage.generations.last.basedOnReport, 1);
   });
 
   test('replaying an older boss does not grow the lineage', () {

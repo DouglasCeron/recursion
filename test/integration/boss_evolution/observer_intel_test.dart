@@ -20,23 +20,22 @@ void main() {
     expect(profile.levelOf(WeaponType.heavyCannon), isNull);
   });
 
-  test('destroying the observer keeps the new battle out of the intel, '
-      'without erasing earlier reports', () {
+  test('an observer that flees early still reports, but saw no boss '
+      'damage, without erasing earlier reports', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     playBattle(container);
     playBattle(container, shootObserver: true);
 
-    expect(container.read(bossIntelControllerProvider).reports, hasLength(1));
-  });
-
-  test('without any transmission the enemy knows nothing', () {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-
-    playBattle(container, shootObserver: true);
-
-    expect(container.read(bossIntelControllerProvider).isEmpty, isTrue);
+    final reports = container.read(bossIntelControllerProvider).reports;
+    expect(reports, hasLength(2));
+    expect(reports.first.profile.zoneShares, isNotEmpty);
+    expect(
+      reports.last.profile.zoneShares,
+      isEmpty,
+      reason: 'every shot went to the observer until it fled',
+    );
+    expect(reports.last.profile.levelOf(WeaponType.blaster), isNotNull);
   });
 }

@@ -49,8 +49,9 @@ class BriefingScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               if (generation.basedOnReport != null && generation.steps.isEmpty)
                 const Text(
-                  'Your damage was spread out, or the focused zones are '
-                  'already maxed out: nothing new.',
+                  'Nothing new: your damage was spread out, the observer '
+                  'fled before seeing much, or the focused zones are already '
+                  'maxed out.',
                 ),
               for (final step in generation.steps)
                 Card(

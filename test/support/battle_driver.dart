@@ -10,8 +10,8 @@ const frameStep = 1 / 60;
 
 /// Plays a full battle through the providers, without rendering.
 ///
-/// Each player shot hits the observer while [shootObserver] is true and it is
-/// alive; otherwise the first part in [targetOrder] that is still standing.
+/// Each player shot hits the observer while [shootObserver] is true and it
+/// has not fled; otherwise the first part in [targetOrder] that is still standing.
 /// Enemy shots always miss. Returns the session and every event published.
 ({BattleSession session, List<BattleEvent> events}) playBattle(
   ProviderContainer container, {
@@ -30,7 +30,7 @@ const frameStep = 1 / 60;
     final before = events.length;
     session.update(frameStep);
     for (final shot in events.skip(before).whereType<WeaponFired>().toList()) {
-      if (shootObserver && !session.state.observer.isDestroyed) {
+      if (shootObserver && !session.state.observer.hasFled) {
         session.reportObserverHit(shot.projectileId);
         continue;
       }

@@ -29,9 +29,10 @@ After the proof of concept:
 | 11 | Boss 2 becomes the Sentinel Mk II, evolved from the Sentinel's damage history | Done |
 | 12 | Endless boss lineage: each boss evolves from the previous one (armor levels, extra plates) | Done |
 | 13 | Damage shown as part colors and cracks instead of integrity bars | Done |
-| 14 | Weapon mutations: extra cannons where the boss lost one | Planned |
-| 15 | Enemy laser and missile as evolutions after two cannons | Planned |
-| 16 | Richer observer (ship position, destruction order) | Planned |
+| 14 | Observer flees instead of dying and dodges hits; whole-boss critical flash; Next boss button | Done |
+| 15 | Weapon mutations: extra cannons where the boss lost one | Planned |
+| 16 | Enemy laser and missile as evolutions after two cannons | Planned |
+| 17 | Richer observer (ship position, destruction order) | Planned |
 
 ## Requirements
 
@@ -55,9 +56,8 @@ automatically.
 Suggested first session: open Campaign and fight the Sentinel (destroy its
 cannon and touch the falling Heavy Cannon to collect it), equip it in
 Inventory, then pick the Sentinel Mk II on the map and read its briefing: its
-armor evolved where you hit the Sentinel the most. Destroy the observer
-drone on the left edge if you do not want the enemy to learn from that
-battle.
+armor evolved where you hit the Sentinel the most. Chase the observer
+drone off early if you want the enemy to learn less from that battle.
 
 ## Campaign
 
@@ -70,6 +70,9 @@ battle.
   mark). Every boss can be replayed.
 - Evolved bosses open their briefing first; the Sentinel goes straight to
   battle.
+- After a victory, the result screen offers **Next boss**, which opens the
+  briefing of the boss after the one just beaten (not necessarily the
+  latest).
 
 ## Checks and builds
 
@@ -125,7 +128,7 @@ Defined in `lib/features/combat/domain/content/boss_catalog.dart`.
   bonus; outside it the core takes normal damage.
 - **Escape:** when the core drops to 30% of its integrity (120 of 400) or
   below, the boss announces the escape (HUD countdown and
-  flashing parts) and leaves 5 s later unless the core is destroyed first.
+  one square frame blinking around the whole boss) and leaves 5 s later unless the core is destroyed first.
   The escape is announced at most once.
 - **Ship:** 100 hull. After taking damage it is invulnerable for 0.75 s.
   Hull at zero loses the battle.
@@ -182,7 +185,8 @@ Three separate concepts:
 1. **`BattleRecord`** — internal summary of what really happened (outcome,
    duration, per-weapon shots/hits/damage, core damage, destroyed parts,
    collected items). Always complete.
-2. **Observer transmission** — what the enemy drone recorded while alive:
+2. **Observer transmission** — what the enemy drone recorded while it was
+   in the battle:
    per-weapon-type shots, hits and damage, damage per boss zone, plus core
    damage dealt while the core was exposed. Nothing else (no inventory, no
    positions).
@@ -191,11 +195,16 @@ Three separate concepts:
 
 Rules:
 
-- The drone hovers along the left edge with **60 integrity**. It does not
-  attack and can be destroyed by any player weapon.
-- It transmits **when the battle ends, if it is still alive**, whatever the
-  outcome (victory, defeat or escape). Destroying it means the enemy gets no
-  new intel from that battle.
+- The drone starts on the left edge with **60 integrity**. It does not
+  attack and cannot be destroyed.
+- Every hit it survives sends it dashing to a new spot on the left or right
+  edge, below the boss and at least 90 units away, so it is hard to hit
+  twice in a row. The spot is picked by the domain (`ObserverDrone`).
+- Once it has taken 60 damage it **flees** the battle and stops watching.
+- It transmits **when the battle ends**, whatever the outcome (victory,
+  defeat or escape), even if it fled: then the report only covers what it
+  saw before leaving. Chasing it off early is how the player limits what the
+  enemy learns.
 - Each transmission becomes a `WeaponExposureProfile`. Each weapon type that
   was fired gets a level from its share of the total damage dealt:
   **low < 15% ≤ medium ≤ 50% < high**. Weapons that were never fired are not
@@ -227,7 +236,8 @@ the left side can reach boss 5 with only the left side upgraded.
   defeat or escape) generates the next one. Replaying an older boss never
   changes the lineage.
 - **What it learns from:** the report the observer transmitted from that
-  battle. If the observer was destroyed, the next boss is born unchanged.
+  battle. If the observer fled before seeing any boss damage, the report has
+  no zone focus and the next boss is born unchanged.
   The inventory is never used.
 - **Director** (`EvolutionDirector`, deterministic): every zone that took at
   least **30%** of the damage dealt to boss parts is a candidate. Mutations
@@ -260,7 +270,7 @@ Inventory, equipped weapon, enemy intel, progress (battles fought, bosses
 fought and defeated, last battle record) and the boss lineage survive an app
 restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 5) in
+- Stored as one JSON document with a `schemaVersion` (currently 6) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -282,7 +292,8 @@ restart.
   `migrations[4]` upgrades v4 to v5 by adding the lineage: v4 had two fixed
   bosses, the Sentinel and the Mk II (`boss.sentinel_mk2`, renamed to
   `boss.sentinel.gen2`). Each one that was fought gets its next generation,
-  evolved from its latest report.
+  evolved from its latest report. `migrations[5]` upgrades v5 to v6: the
+  last battle's `observerDestroyed` becomes `observerFled`.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
@@ -302,6 +313,9 @@ restart.
   battle flow, the providers and the menu and map screens, not what is drawn.
 - Damage is shown by color and cracks only, so exact integrity values are
   not visible during a battle.
+- The enemy now gets a report from every battle. Zone focus is a share, so
+  even a short look reveals where the player was aiming; chasing the
+  observer off only helps if it leaves before the boss takes damage.
 
 ## Tests
 
@@ -313,7 +327,8 @@ restart.
   save codec and versioning, shared preferences adapter).
 - `test/integration/` — full boss battles (victory and escape) played through
   `BattleSession`, drop collection wired to the inventory, observer
-  transmissions reaching (or not reaching) the enemy intel, a center-focused Sentinel battle evolving the Mk II's center (and the
+  transmissions reaching the enemy intel (partial when it fled early), a
+  center-focused Sentinel battle evolving the Mk II's center (and the
   Blaster still beating it), evolutions accumulating into the Mk III, older
   bosses not growing the lineage, and an app restart restoring the save and
   the lineage, all through Riverpod without rendering.

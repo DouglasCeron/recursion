@@ -152,23 +152,30 @@ class ItemExpired extends BattleEvent {
   final String itemId;
 }
 
+/// The observer took a hit; unless it fled, it is moving to ([x], [y]).
 class ObserverHit extends BattleEvent {
   const ObserverHit({
     required this.projectileId,
     required this.damage,
     required this.remainingIntegrity,
+    required this.x,
+    required this.y,
   });
 
   final int projectileId;
   final int damage;
   final int remainingIntegrity;
+  final double x;
+  final double y;
 }
 
-class ObserverDestroyed extends BattleEvent {
-  const ObserverDestroyed();
+/// The observer took too much damage and left the battle. It stops watching
+/// but still transmits what it saw when the battle ends.
+class ObserverFled extends BattleEvent {
+  const ObserverFled();
 }
 
-/// The observer survived and sent what it recorded to the enemy faction.
+/// The observer sent what it recorded to the enemy faction.
 class ObserverTransmitted extends BattleEvent {
   const ObserverTransmitted({required this.stats});
 
