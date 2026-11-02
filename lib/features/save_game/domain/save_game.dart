@@ -1,4 +1,5 @@
 import '../../boss_evolution/domain/boss_intel.dart';
+import '../../boss_evolution/domain/boss_lineage.dart';
 import '../../inventory/domain/inventory.dart';
 import '../../progression/domain/player_progress.dart';
 
@@ -9,6 +10,7 @@ class SaveGame {
     required this.loadout,
     required this.intel,
     required this.progress,
+    this.lineage = const BossLineage(),
   });
 
   factory SaveGame.initial() => SaveGame(
@@ -16,12 +18,16 @@ class SaveGame {
     loadout: Loadout.starter(),
     intel: const BossIntel(),
     progress: const PlayerProgress(),
+    lineage: const BossLineage(),
   );
 
   final Inventory inventory;
   final Loadout loadout;
   final BossIntel intel;
   final PlayerProgress progress;
+
+  /// The chain of bosses generated so far.
+  final BossLineage lineage;
 }
 
 enum SaveLoadStatus {

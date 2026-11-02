@@ -90,7 +90,7 @@ class _BattleHud extends StatelessWidget {
             if (_adaptations(hud) case final adaptations?) ...[
               const SizedBox(height: 4),
               Text(
-                'Adapted: $adaptations',
+                'Evolved: $adaptations',
                 style: textTheme.labelSmall?.copyWith(
                   color: const Color(0xFF4DD0E1),
                 ),
@@ -152,7 +152,7 @@ class _BattleHud extends StatelessWidget {
             '−${((1 - hud.weaponDamageMultiplier) * 100).round()}%',
       if (hud.coreWindowShortened)
         'core window ${hud.coreWindowOpenDuration.toStringAsFixed(0)}s',
-      if (hud.reinforcedZone case final zone?) '${zone.name} zone reinforced',
+      ...hud.evolutions,
     ];
     return parts.isEmpty ? null : parts.join('  •  ');
   }

@@ -133,10 +133,14 @@ class BossPartComponent extends PositionComponent {
     ..color = const Color(0xFF4DD0E1)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 2;
-  static final _reinforcedPaint = Paint()
+  static final _evolvedPaint = Paint()
     ..color = const Color(0xFFFFB74D)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 2;
+  static final _armorLevelPaint = Paint()
+    ..color = const Color(0xCCFFE0B2)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1;
 
   @override
   Future<void> onLoad() async {
@@ -199,8 +203,15 @@ class BossPartComponent extends PositionComponent {
           : canvas.drawRect(shade, _coveredShadePaint);
     }
     _renderIntegrityBar(canvas, rect);
-    if (definition.reinforced) {
-      canvas.drawRect(rect.inflate(2), _reinforcedPaint);
+    // One inner line per armor level above 1.
+    for (var level = 2; level <= definition.armorLevel; level++) {
+      final inner = rect.deflate(2 * (level - 1));
+      if (inner.width > 0 && inner.height > 0) {
+        canvas.drawRect(inner, _armorLevelPaint);
+      }
+    }
+    if (definition.evolved) {
+      canvas.drawRect(rect.inflate(2), _evolvedPaint);
     } else if (boss.modifiers.damageMultipliers.isNotEmpty &&
         definition.kind != BossComponentKind.core) {
       canvas.drawRect(rect.inflate(2), _adaptedPaint);

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../features/boss_evolution/domain/boss_evolution.dart';
 import '../features/boss_evolution/presentation/briefing_screen.dart';
 import '../features/combat/domain/content/boss_catalog.dart';
 import '../features/combat/presentation/battle_screen.dart';
@@ -32,9 +31,10 @@ abstract final class AppRouter {
     return MaterialPageRoute(
       settings: settings,
       builder: (context) => switch (uri.path) {
+        // Evolved bosses open their briefing first; base bosses do not.
         AppRoutes.campaign => CampaignMapScreen(
           onBossSelected: (id) => Navigator.of(context).pushNamed(
-            AdaptationRules.adaptiveBossIds.contains(id)
+            BossCatalog.byId(id) == null
                 ? AppRoutes.briefing
                 : AppRoutes.battle,
             arguments: id,

@@ -1,24 +1,8 @@
-import '../../combat/domain/content/boss_catalog.dart';
 import '../../combat/domain/entities/battle_record.dart';
 import '../../combat/domain/events/battle_event.dart';
 
-/// The campaign is a single path of bosses, in [BossCatalog.all] order.
-///
-/// A boss unlocks once the previous one has been fought, whatever the
-/// outcome; the first one is always available.
-abstract final class CampaignRules {
-  static List<String> get order => [
-    for (final boss in BossCatalog.all) boss.id,
-  ];
-
-  /// The boss that must be fought before [bossId], or null for the first.
-  static String? requirementFor(String bossId) {
-    final index = order.indexOf(bossId);
-    return index > 0 ? order[index - 1] : null;
-  }
-}
-
-/// The player's progress across battles.
+/// The player's progress across battles. Which bosses exist (and so are
+/// unlocked) is decided by the boss lineage, not here.
 class PlayerProgress {
   const PlayerProgress({
     this.battlesFought = 0,
@@ -35,11 +19,6 @@ class PlayerProgress {
   /// Bosses the player has destroyed at least once.
   final Set<String> defeatedBossIds;
   final BattleRecord? lastBattle;
-
-  bool isBossUnlocked(String bossId) {
-    final required = CampaignRules.requirementFor(bossId);
-    return required == null || foughtBossIds.contains(required);
-  }
 
   bool isBossDefeated(String bossId) => defeatedBossIds.contains(bossId);
 

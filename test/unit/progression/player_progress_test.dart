@@ -18,30 +18,7 @@ BattleRecord recordFor(String bossId, BattleOutcome outcome) => BattleRecord(
 
 void main() {
   final sentinel = BossCatalog.sentinel.id;
-  final mk2 = BossCatalog.sentinelMk2.id;
-
-  test('the first boss is always unlocked; the Sentinel Mk II is not', () {
-    const progress = PlayerProgress();
-
-    expect(progress.isBossUnlocked(sentinel), isTrue);
-    expect(progress.isBossUnlocked(mk2), isFalse);
-  });
-
-  test('any finished Sentinel battle unlocks the Sentinel Mk II', () {
-    for (final outcome in BattleOutcome.values) {
-      final progress = const PlayerProgress().recordBattle(
-        recordFor(sentinel, outcome),
-      );
-
-      expect(progress.isBossUnlocked(mk2), isTrue, reason: '$outcome');
-    }
-  });
-
-  test('the campaign follows the boss catalog order', () {
-    expect(CampaignRules.order, [sentinel, mk2]);
-    expect(CampaignRules.requirementFor(sentinel), isNull);
-    expect(CampaignRules.requirementFor(mk2), sentinel);
-  });
+  const mk2 = 'boss.sentinel.gen2';
 
   test('only a victory marks a boss as defeated', () {
     final lost = const PlayerProgress()

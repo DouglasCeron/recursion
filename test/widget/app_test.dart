@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/app/app.dart';
+import 'package:recursion/features/boss_evolution/application/boss_lineage_controller.dart';
+import 'package:recursion/features/boss_evolution/domain/boss_lineage.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/battle_record.dart';
 import 'package:recursion/features/combat/domain/entities/combat_log.dart';
@@ -25,7 +27,7 @@ Finder nodeOf(String bossId) => find.byKey(Key('campaign.node.$bossId'));
 
 void main() {
   final sentinel = BossCatalog.sentinel.id;
-  final mk2 = BossCatalog.sentinelMk2.id;
+  const mk2 = 'boss.sentinel.gen2';
 
   testWidgets('home leads to the campaign, not to individual bosses', (
     tester,
@@ -41,7 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1. Sentinel'), findsOneWidget);
-    expect(find.text('2. Sentinel Mk II'), findsOneWidget);
+    expect(find.text('2. ???'), findsOneWidget);
   });
 
   testWidgets('a new campaign has only the first boss available', (
@@ -59,13 +61,13 @@ void main() {
     expect(find.text('Available'), findsOneWidget);
     expect(find.text('Locked'), findsOneWidget);
 
-    await tester.tap(nodeOf(mk2));
+    await tester.tap(nodeOf('next'));
     expect(selected, isNull);
     await tester.tap(nodeOf(sentinel));
     expect(selected, sentinel);
   });
 
-  testWidgets('the map shows defeated bosses and what they unlocked', (
+  testWidgets('the map shows defeated bosses and the boss they evolved', (
     tester,
   ) async {
     String? selected;
@@ -77,6 +79,9 @@ void main() {
               recordFor(sentinel, BattleOutcome.victory),
             ),
           ),
+          initialBossLineageProvider.overrideWithValue(
+            const BossLineage().withNext(const BossGeneration()),
+          ),
         ],
         child: MaterialApp(
           home: CampaignMapScreen(onBossSelected: (id) => selected = id),
@@ -86,6 +91,8 @@ void main() {
 
     expect(find.text('Defeated'), findsOneWidget);
     expect(find.text('Available'), findsOneWidget);
+    expect(find.text('2. Sentinel Mk II'), findsOneWidget);
+    expect(find.text('3. ???'), findsOneWidget);
     await tester.tap(nodeOf(mk2));
     expect(selected, mk2);
   });

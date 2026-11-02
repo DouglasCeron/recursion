@@ -14,7 +14,7 @@ void main() {
   test('the top HUD shows the boss as one total integrity bar', () {
     final battle = BattleState(
       ship: ShipState(arena: arena, weapon: WeaponCatalog.blaster),
-      boss: BossState(definition: BossCatalog.sentinelMk2, arena: arena),
+      boss: BossState(definition: BossCatalog.sentinel, arena: arena),
     )..start();
 
     final fresh = BattleHudState.fromBattle(battle);
@@ -27,7 +27,7 @@ void main() {
         .single;
     battle.resolveHit(
       projectileId: shot.projectileId,
-      componentId: 'sentinel_mk2.hull_left',
+      componentId: 'sentinel.hull_left',
     );
 
     final hit = BattleHudState.fromBattle(battle);

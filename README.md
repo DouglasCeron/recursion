@@ -27,7 +27,11 @@ After the proof of concept:
 | 9 | Player focus by zone; the next boss reinforces the focused zone | Done |
 | 10 | Battle HUD that scales with many boss parts | Done |
 | 11 | Boss 2 becomes the Sentinel Mk II, evolved from the Sentinel's damage history | Done |
-| — | Laser as a weapon of a future boss; Missile | Pending |
+| 12 | Endless boss lineage: each boss evolves from the previous one (armor levels, extra plates) | Done |
+| 13 | Damage shown as part colors instead of integrity bars | Planned |
+| 14 | Weapon mutations: extra cannons where the boss lost one | Planned |
+| 15 | Enemy laser and missile as evolutions after two cannons | Planned |
+| 16 | Richer observer (ship position, destruction order) | Planned |
 
 ## Requirements
 
@@ -41,8 +45,8 @@ flutter pub get
 flutter run                    # opens the main menu
 flutter run --route /campaign  # opens the campaign map
 flutter run --route /battle    # jumps straight into the Sentinel battle
-flutter run --route "/battle?boss=boss.sentinel_mk2"    # the Sentinel Mk II
-flutter run --route "/briefing?boss=boss.sentinel_mk2"  # its briefing
+flutter run --route "/battle?boss=boss.sentinel.gen2"    # the second boss
+flutter run --route "/briefing?boss=boss.sentinel.gen2"  # its briefing
 ```
 
 Controls: drag anywhere on the screen to move the ship; weapons fire
@@ -51,7 +55,7 @@ automatically.
 Suggested first session: open Campaign and fight the Sentinel (destroy its
 cannon and touch the falling Heavy Cannon to collect it), equip it in
 Inventory, then pick the Sentinel Mk II on the map and read its briefing: its
-armor is reinforced where you hit the Sentinel the most. Destroy the observer
+armor evolved where you hit the Sentinel the most. Destroy the observer
 drone on the left edge if you do not want the enemy to learn from that
 battle.
 
@@ -59,12 +63,13 @@ battle.
 
 - The main menu has Campaign, Inventory and Reset progress (asks for
   confirmation, then erases items, progress and enemy intel).
-- The campaign map shows every boss as a numbered point on one path, in
-  `BossCatalog.all` order, joined by lines. Each point is locked,
-  available, fought (not defeated yet) or defeated (check mark).
-- A boss unlocks once the previous one has been fought, whatever the
-  outcome; the line to it lights up. Defeated bosses can be replayed.
-- Adaptive bosses open their briefing first; others go straight to battle.
+- The campaign is endless. The map shows every boss of the lineage as a
+  numbered point on one path, joined by lines, then one locked `???` point:
+  the next boss does not exist until the latest one has been fought.
+- Each point is available, fought (not defeated yet) or defeated (check
+  mark). Every boss can be replayed.
+- Evolved bosses open their briefing first; the Sentinel goes straight to
+  battle.
 
 ## Checks and builds
 
@@ -146,7 +151,7 @@ Battle outcomes: `victory` (core destroyed), `defeat` (ship destroyed) and
 ### Battle HUD
 
 - The top of the screen shows only the boss name, its pattern, one bar with
-  the total integrity of every part, and the active adaptation.
+  the total integrity of every part, and the evolutions it carries.
 - Each part has its own thin integrity bar drawn in the arena, just above it;
   it disappears when the part is destroyed. This scales with any number of
   parts.
@@ -202,37 +207,43 @@ Rules:
 - Metrics are aggregated in memory during the battle; nothing is written per
   shot.
 
-## Second boss: Sentinel Mk II (evolved)
+## Boss lineage (evolution)
 
-Point 2 of the campaign, unlocked after the first Sentinel battle, whatever
-its outcome. It opens a briefing screen first.
+Only the first boss, the Sentinel, is written by hand. Every later boss is
+generated: it is the previous boss plus a few **mutations** chosen from how
+you fought it. There is no fixed list of bosses: a player who keeps hitting
+the left side can reach boss 5 with only the left side upgraded.
 
-Each boss is an evolution of the previous one. The Mk II is the Sentinel
-rebuilt (`BossCatalog.evolve`): same parts, positions, attacks, core window
-and escape rule (core at 30%, 120 of 400). Only its armor changes, from the
-intel about your **latest Sentinel battle**:
+- **Lineage** (`BossLineage`): the base boss plus one generation per boss.
+  A generation stores only its mutations; a boss is rebuilt by applying every
+  generation up to it, so it is identical every time it is fought. Bosses
+  are named `Sentinel`, `Sentinel Mk II`, `Mk III`... with ids
+  `boss.sentinel`, `boss.sentinel.gen2`, `boss.sentinel.gen3`...
+- **When it grows:** finishing a battle against the **latest** boss (victory,
+  defeat or escape) generates the next one. Replaying an older boss never
+  changes the lineage.
+- **What it learns from:** the report the observer transmitted from that
+  battle. If the observer was destroyed, the next boss is born unchanged.
+  The inventory is never used.
+- **Director** (`EvolutionDirector`, deterministic): every zone that took at
+  least **30%** of the damage dealt to boss parts is a candidate. Mutations
+  are ranked by that share (armor upgrade first, then extra plate) and
+  applied while valid, up to **3 per generation**. The same boss and report
+  always give the same evolution.
 
-- Every boss after the first adapts, and only from the latest report of a
-  battle against the **previous boss** in the campaign. Each report records
-  the boss it came from; reports from other bosses (including a Mk II
-  rematch) are ignored. The inventory is never used.
-- Without that intel (no Sentinel battle yet, or its observer was destroyed),
-  the Mk II uses the default armor.
+**Mutations** (`lib/features/combat/domain/entities/boss_mutation.dart`):
 
-**Zone reinforcement**
-
-- Only the most hit zone, and only if it took at least **45%** of the damage
-  dealt to boss parts. One zone at most; it does not stack with earlier
-  reports.
-- Every structure in that zone gets **+50% max integrity**. The core is not a
-  structure and keeps its integrity, so the escape threshold does not change.
-- An extra **reinforcement plate** (armor, 80 integrity) is placed just below
-  the zone, spanning its parts. It covers every part of the zone that had no
-  cover, so it has to break first.
-- Reinforced parts get an orange outline in battle, and the HUD and the
-  briefing name the zone and the share of damage that caused it.
-- The combat domain only sees neutral `BossModifiers`; the rules that build
-  them live in `boss_evolution` (`AdaptationRules`).
+- **Armor upgrade:** every armor and hull part of the zone gains one armor
+  level, up to level 3. Each level adds half of the part's level-1
+  integrity (armor 100 → 150 → 200, wing 70 → 105 → 140). The core and
+  weapons are never upgraded, so the escape threshold does not change.
+- **Extra plate:** one armor plate (80 integrity) just below the zone,
+  spanning its parts. It covers every part of the zone that had no cover, so
+  it has to break first. One per zone; later armor upgrades raise it too.
+- Evolved parts get an orange outline in battle and one inner line per
+  armor level above 1. The HUD lists the evolutions the boss carries, and
+  the briefing explains each new mutation with the share of damage that
+  caused it.
 
 Combat still supports mechanics no catalog boss uses yet: per-weapon damage
 multipliers, a shortened core window, and a core shield powered by cannons.
@@ -241,10 +252,11 @@ available to future bosses.
 
 ## Saving
 
-Inventory, equipped weapon, enemy intel and progress (battles fought, bosses
-fought and defeated, last battle record) survive an app restart.
+Inventory, equipped weapon, enemy intel, progress (battles fought, bosses
+fought and defeated, last battle record) and the boss lineage survive an app
+restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 4) in
+- Stored as one JSON document with a `schemaVersion` (currently 5) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -253,27 +265,34 @@ fought and defeated, last battle record) survive an app restart.
   intel or finishing a battle. Never per frame.
 - Bad data never crashes the game: a corrupted save, or one written by a
   newer schema version, starts a new game and is replaced on the next write.
-  Unknown item, boss or weapon ids are dropped, and an equipped weapon that
-  is no longer owned falls back to the Blaster.
+  Unknown item, weapon, zone or mutation ids, and bosses outside the saved
+  lineage, are dropped. An equipped weapon that is no longer owned falls
+  back to the Blaster.
 - Schema changes go through `SaveGameCodec.migrations`, one step per version.
   `migrations[1]` upgrades v1 to v2 by adding the defeated bosses: v1 only
   knew the last battle, so its boss counts as defeated if that battle was a
   victory. `migrations[2]` upgrades v2 to v3 by adding damage per zone: older
-  reports and battles get none, so they never trigger a reinforcement.
+  reports and battles get none, so they never drive an evolution.
   `migrations[3]` upgrades v3 to v4 by adding the boss each report came from:
   older reports cannot be attributed, so no boss evolves from them.
+  `migrations[4]` upgrades v4 to v5 by adding the lineage: v4 had two fixed
+  bosses, the Sentinel and the Mk II (`boss.sentinel_mk2`, renamed to
+  `boss.sentinel.gen2`). Each one that was fought gets its next generation,
+  evolved from its latest report.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
 ## Known limitations
 
-- Prototype content only: two bosses and two weapons (Missile and Laser
-  types exist in the domain but have no content yet; the Laser is planned as
-  a weapon of a future boss).
+- Prototype content only: one base boss, two mutation kinds and two player
+  weapons (Missile and Laser types exist in the domain but have no content
+  yet; enemy lasers and missiles are planned as evolutions).
 - The Sentinel concentrates most of its integrity in the center (670 of 740),
-  so a battle that ends in victory or escape almost always reinforces the
-  center. The side zones only get reinforced after short battles focused on
-  a wing.
+  so a battle that ends in victory or escape almost always evolves the
+  center. The sides only evolve after battles that spend a lot of fire on a
+  wing.
+- Mutations only add armor for now; the boss's weapons and attacks do not
+  evolve yet.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.
@@ -284,16 +303,15 @@ fought and defeated, last battle record) survive an app restart.
 
 - `test/unit/` — domain rules (damage, boss parts, vulnerability window,
   escape rule, boss behavior, drops, observer, battle record, exposure
-  profile, intel, adaptation rules, zone damage and reinforcement, core
-  shield and modifiers, boss
-  unlocks, ship movement/firing/hull, battle state, inventory and loadout,
+  profile, intel, zone damage, boss mutations, lineage and evolution
+  director, core shield and modifiers, campaign progress, ship
+  movement/firing/hull, battle state, inventory and loadout,
   save codec and versioning, shared preferences adapter).
 - `test/integration/` — full boss battles (victory and escape) played through
   `BattleSession`, drop collection wired to the inventory, observer
-  transmissions reaching (or not reaching) the enemy intel, different weapon
-  a center-focused Sentinel battle reinforcing the Mk II's center (and the
-  Blaster still beating it), Mk II rematches not feeding its own evolution,
-  and an app restart restoring the
-  save, all through Riverpod without rendering.
+  transmissions reaching (or not reaching) the enemy intel, a center-focused Sentinel battle evolving the Mk II's center (and the
+  Blaster still beating it), evolutions accumulating into the Mk III, older
+  bosses not growing the lineage, and an app restart restoring the save and
+  the lineage, all through Riverpod without rendering.
 - `test/widget/` — main menu, campaign map states and navigation, and the
   reset confirmation.

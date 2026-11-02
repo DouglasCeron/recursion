@@ -2,10 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/boss_evolution/domain/boss_intel.dart';
+import 'package:recursion/features/boss_evolution/domain/boss_lineage.dart';
 import 'package:recursion/features/boss_evolution/domain/weapon_exposure_profile.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
 import 'package:recursion/features/combat/domain/entities/battle_record.dart';
 import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
+import 'package:recursion/features/combat/domain/entities/boss_mutation.dart';
 import 'package:recursion/features/combat/domain/entities/combat_log.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
 import 'package:recursion/features/inventory/domain/inventory.dart';
@@ -49,6 +51,18 @@ SaveGame sampleGame() {
         intelTransmitted: true,
       ),
     ),
+    lineage: const BossLineage().withNext(
+      const BossGeneration(
+        basedOnReport: 1,
+        steps: [
+          EvolutionStep(
+            mutation: ArmorUpgrade(BossZone.center),
+            zoneShare: 0.75,
+          ),
+          EvolutionStep(mutation: ExtraPlate(BossZone.center), zoneShare: 0.75),
+        ],
+      ),
+    ),
   );
 }
 
@@ -87,7 +101,7 @@ void main() {
 
     final progress = game.progress;
     expect(progress.battlesFought, 1);
-    expect(progress.isBossUnlocked(BossCatalog.sentinelMk2.id), isTrue);
+    expect(progress.foughtBossIds, {BossCatalog.sentinel.id});
     final record = progress.lastBattle!;
     expect(record.outcome, BattleOutcome.victory);
     expect(record.duration, 42.5);
@@ -168,6 +182,54 @@ void main() {
     expect(game.progress.foughtBossIds, isEmpty);
   });
 
+  test('the boss lineage survives a round trip', () {
+    final lineage = codec.decode(codec.encode(sampleGame())).game.lineage;
+
+    expect(lineage.base.id, BossCatalog.sentinel.id);
+    expect(lineage.length, 2);
+    final generation = lineage.generations.last;
+    expect(generation.basedOnReport, 1);
+    expect(generation.steps.map((s) => s.mutation), [
+      isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.center),
+      isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.center),
+    ]);
+    expect(generation.steps.first.zoneShare, 0.75);
+  });
+
+  test('unknown mutations and zones are dropped from the lineage', () {
+    final document = documentOf(sampleGame());
+    final generations = (document['lineage'] as Map)['generations'] as List;
+    (generations.last as Map)['steps'] = [
+      {'mutation': 'laser', 'zone': 'center', 'zoneShare': 0.9},
+      {'mutation': 'armorUpgrade', 'zone': 'top', 'zoneShare': 0.9},
+      {'mutation': 'armorUpgrade', 'zone': 'left', 'zoneShare': 0.9},
+    ];
+
+    final lineage = codec.decode(jsonEncode(document)).game.lineage;
+
+    expect(lineage.length, 2);
+    expect(
+      lineage.generations.last.steps.single.mutation,
+      isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.left),
+    );
+  });
+
+  test('bosses outside the saved lineage are dropped', () {
+    final document = documentOf(sampleGame());
+    (document['progress'] as Map)['foughtBossIds'] = [
+      BossCatalog.sentinel.id,
+      'boss.sentinel.gen2',
+      'boss.sentinel.gen7',
+    ];
+
+    final progress = codec.decode(jsonEncode(document)).game.progress;
+
+    expect(progress.foughtBossIds, {
+      BossCatalog.sentinel.id,
+      'boss.sentinel.gen2',
+    });
+  });
+
   test('defeated bosses survive a round trip', () {
     final game = codec.decode(codec.encode(sampleGame())).game;
 
@@ -175,10 +237,16 @@ void main() {
   });
 
   group('migrations', () {
-    /// The v3 document an earlier release would have written for [game]:
-    /// reports do not know their boss.
+    /// The v4 document an earlier release would have written for [game]:
+    /// no lineage, and a fixed second boss.
+    Map<String, Object?> v4DocumentOf(SaveGame game) {
+      final document = documentOf(game)..remove('lineage');
+      return {...document, 'schemaVersion': 4};
+    }
+
+    /// The v3 document: v4 where reports do not know their boss.
     Map<String, Object?> v3DocumentOf(SaveGame game) {
-      final document = documentOf(game);
+      final document = v4DocumentOf(game);
       for (final report in ((document['intel'] as Map)['reports'] as List)) {
         (report as Map).remove('bossId');
       }
@@ -195,6 +263,52 @@ void main() {
       (lastBattle?['stats'] as Map?)?.remove('zoneDamage');
       return {...document, 'schemaVersion': 2};
     }
+
+    test('v4 saves get a lineage, keeping their fixed second boss and '
+        'evolving a third one from it', () {
+      final document = v4DocumentOf(sampleGame());
+      final progress = document['progress'] as Map;
+      progress['foughtBossIds'] = [
+        BossCatalog.sentinel.id,
+        'boss.sentinel_mk2',
+      ];
+      progress['defeatedBossIds'] = ['boss.sentinel_mk2'];
+      final reports = (document['intel'] as Map)['reports'] as List;
+      (reports.single as Map)['bossId'] = 'boss.sentinel_mk2';
+
+      final game = codec.decode(jsonEncode(document)).game;
+
+      expect(game.lineage.length, 3);
+      expect(
+        game.lineage.generations[1].steps,
+        isEmpty,
+        reason: 'no report of the Sentinel itself',
+      );
+      expect(game.lineage.generations[2].basedOnReport, 1);
+      expect(game.progress.foughtBossIds, contains('boss.sentinel.gen2'));
+      expect(game.progress.defeatedBossIds, {'boss.sentinel.gen2'});
+      expect(game.intel.latest!.bossId, 'boss.sentinel.gen2');
+    });
+
+    test('v4 saves evolve their second boss from the last Sentinel report', () {
+      final game = codec.decode(jsonEncode(v4DocumentOf(sampleGame()))).game;
+
+      expect(game.lineage.length, 2);
+      final generation = game.lineage.generations.last;
+      expect(generation.basedOnReport, 1);
+      expect(generation.steps.map((s) => s.mutation), [
+        isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.center),
+        isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.center),
+      ]);
+    });
+
+    test('v4 saves that never fought get only the base boss', () {
+      final document = v4DocumentOf(SaveGame.initial());
+
+      final game = codec.decode(jsonEncode(document)).game;
+
+      expect(game.lineage.length, 1);
+    });
 
     test('v3 reports load without a boss, so nothing evolves from them', () {
       final result = codec.decode(jsonEncode(v3DocumentOf(sampleGame())));
@@ -272,15 +386,15 @@ void main() {
       final progress = codec.decode(v1Of(lost)).game.progress;
 
       expect(progress.defeatedBossIds, isEmpty);
-      expect(progress.isBossUnlocked(BossCatalog.sentinelMk2.id), isTrue);
+      expect(codec.decode(v1Of(lost)).game.lineage.length, 2);
     });
 
     test('migrations run in sequence up to the current version', () {
-      final v4Codec = SaveGameCodec(
-        version: 4,
+      final nextCodec = SaveGameCodec(
+        version: SaveGameCodec.currentVersion + 1,
         migrations: {
           ...SaveGameCodec.defaultMigrations,
-          3: (document) => {
+          SaveGameCodec.currentVersion: (document) => {
             ...document,
             'inventory': {
               'itemIds': [WeaponCatalog.heavyCannon.id],
@@ -289,7 +403,7 @@ void main() {
         },
       );
 
-      final result = v4Codec.decode(v1Of(SaveGame.initial()));
+      final result = nextCodec.decode(v1Of(SaveGame.initial()));
 
       expect(result.status, SaveLoadStatus.loaded);
       expect(

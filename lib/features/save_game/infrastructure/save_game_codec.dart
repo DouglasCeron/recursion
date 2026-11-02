@@ -1,10 +1,13 @@
 import 'dart:convert';
 
 import '../../boss_evolution/domain/boss_intel.dart';
+import '../../boss_evolution/domain/boss_lineage.dart';
+import '../../boss_evolution/domain/evolution_director.dart';
 import '../../boss_evolution/domain/weapon_exposure_profile.dart';
 import '../../combat/domain/content/boss_catalog.dart';
 import '../../combat/domain/entities/battle_record.dart';
 import '../../combat/domain/entities/boss_definition.dart';
+import '../../combat/domain/entities/boss_mutation.dart';
 import '../../combat/domain/entities/combat_log.dart';
 import '../../combat/domain/events/battle_event.dart';
 import '../../inventory/domain/inventory.dart';
@@ -20,15 +23,16 @@ typedef SaveMigration = JsonMap Function(JsonMap document);
 
 /// Converts [SaveGame]s to and from versioned JSON.
 ///
-/// Unknown content ids (items, bosses, weapon types) are dropped on load, so
-/// removing content from the game never breaks an existing save.
+/// Unknown content ids (items, weapon types, zones, and bosses outside the
+/// saved lineage) are dropped on load, so removing content from the game
+/// never breaks an existing save.
 class SaveGameCodec {
   const SaveGameCodec({
     this.version = currentVersion,
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 4;
+  static const currentVersion = 5;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
@@ -36,7 +40,60 @@ class SaveGameCodec {
     1: _addDefeatedBosses,
     2: _addZoneDamage,
     3: _addReportBoss,
+    4: _addLineage,
   };
+
+  static const _mk2Id = 'boss.sentinel_mk2';
+  static const _secondGenerationId = 'boss.sentinel.gen2';
+
+  /// v5 stores the chain of evolved bosses. A v4 save had two fixed bosses,
+  /// the Sentinel and the Sentinel Mk II. Each one that was fought gets the
+  /// next generation, evolved from its latest report as a v5 save would have
+  /// done, and the Mk II becomes the second generation.
+  static JsonMap _addLineage(JsonMap document) {
+    final progress = document['progress'] as JsonMap;
+    final intel = document['intel'] as JsonMap;
+    final reports = (intel['reports'] as List).cast<JsonMap>();
+    final lastBattle = progress['lastBattle'] as JsonMap?;
+    Object? rename(Object? id) => id == _mk2Id ? _secondGenerationId : id;
+    List<Object?> renameAll(Object? ids) => [
+      for (final id in ids as List) rename(id),
+    ];
+    final fought = progress['foughtBossIds'] as List;
+    var lineage = const BossLineage();
+    for (final bossId in [BossCatalog.sentinel.id, _mk2Id]) {
+      if (!fought.contains(bossId)) break;
+      final observed = [
+        for (final report in reports)
+          if (report['bossId'] == bossId) report,
+      ];
+      lineage = lineage.withNext(
+        EvolutionDirector.next(
+          lineage.definitionOf(lineage.latestId)!,
+          observed.isEmpty ? null : _decodeReport(observed.last, lineage),
+        ),
+      );
+    }
+    return {
+      ...document,
+      'lineage': _encodeLineage(lineage),
+      'intel': {
+        ...intel,
+        'reports': [
+          for (final report in (intel['reports'] as List).cast<JsonMap>())
+            {...report, 'bossId': rename(report['bossId'])},
+        ],
+      },
+      'progress': {
+        ...progress,
+        'foughtBossIds': renameAll(progress['foughtBossIds']),
+        'defeatedBossIds': renameAll(progress['defeatedBossIds']),
+        'lastBattle': lastBattle == null
+            ? null
+            : {...lastBattle, 'bossId': rename(lastBattle['bossId'])},
+      },
+    };
+  }
 
   /// v4 records which boss each report came from. Older reports cannot be
   /// attributed, so no boss evolves from them.
@@ -55,7 +112,7 @@ class SaveGameCodec {
   }
 
   /// v3 tracks damage per boss zone. Older reports and battles did not
-  /// record it, so they start with none (and never trigger a reinforcement).
+  /// record it, so they start with none (and never drive an evolution).
   static JsonMap _addZoneDamage(JsonMap document) {
     final intel = document['intel'] as JsonMap;
     final progress = document['progress'] as JsonMap;
@@ -111,6 +168,7 @@ class SaveGameCodec {
     'loadout': {'weaponId': game.loadout.weaponId},
     'intel': {'reports': game.intel.reports.map(_encodeReport).toList()},
     'progress': _encodeProgress(game.progress),
+    'lineage': _encodeLineage(game.lineage),
   });
 
   SaveLoadResult decode(String? raw) {
@@ -140,6 +198,26 @@ class SaveGameCodec {
   static SaveGame _fresh() => SaveGame.initial();
 
   // Encoding.
+
+  static JsonMap _encodeLineage(BossLineage lineage) => {
+    'baseId': lineage.base.id,
+    'generations': lineage.generations.map(_encodeGeneration).toList(),
+  };
+
+  static JsonMap _encodeGeneration(BossGeneration generation) => {
+    'basedOnReport': generation.basedOnReport,
+    'steps': [
+      for (final step in generation.steps)
+        {
+          'mutation': switch (step.mutation) {
+            ArmorUpgrade() => 'armorUpgrade',
+            ExtraPlate() => 'extraPlate',
+          },
+          'zone': step.mutation.zone.name,
+          'zoneShare': step.zoneShare,
+        },
+    ],
+  };
 
   static JsonMap _encodeReport(IntelReport report) => {
     'sequence': report.sequence,
@@ -215,41 +293,77 @@ class SaveGameCodec {
         Loadout.starter().equipWeapon(weaponId, inventory: inventory) ??
         Loadout.starter();
     final reports = (document['intel'] as JsonMap)['reports'] as List;
+    final lineage = _decodeLineage(document['lineage'] as JsonMap);
     return SaveGame(
       inventory: inventory,
       loadout: loadout,
       intel: BossIntel(
         List.unmodifiable([
-          for (final report in reports) _decodeReport(report as JsonMap),
+          for (final report in reports)
+            _decodeReport(report as JsonMap, lineage),
         ]),
       ),
-      progress: _decodeProgress(document['progress'] as JsonMap),
+      progress: _decodeProgress(document['progress'] as JsonMap, lineage),
+      lineage: lineage,
     );
   }
 
-  static IntelReport _decodeReport(JsonMap json) => IntelReport(
-    sequence: json['sequence'] as int,
-    bossId: switch (json['bossId'] as String?) {
-      final id? when BossCatalog.byId(id) != null => id,
+  static BossLineage _decodeLineage(JsonMap json) {
+    final base = BossCatalog.byId(json['baseId'] as String);
+    if (base == null) throw const FormatException('unknown base boss');
+    final generations = [
+      for (final generation in (json['generations'] as List).cast<JsonMap>())
+        BossGeneration(
+          basedOnReport: generation['basedOnReport'] as int?,
+          steps: List.unmodifiable([
+            for (final step in (generation['steps'] as List).cast<JsonMap>())
+              ?_decodeStep(step),
+          ]),
+        ),
+    ];
+    if (generations.isEmpty) throw const FormatException('empty lineage');
+    return BossLineage(base: base, generations: List.unmodifiable(generations));
+  }
+
+  static EvolutionStep? _decodeStep(JsonMap json) {
+    final zone = _zone(json['zone']);
+    if (zone == null) return null;
+    final BossMutation? mutation = switch (json['mutation']) {
+      'armorUpgrade' => ArmorUpgrade(zone),
+      'extraPlate' => ExtraPlate(zone),
       _ => null,
-    },
-    profile: WeaponExposureProfile(
-      weakPointFocus: (json['weakPointFocus'] as num?)?.toDouble(),
-      zoneShares: Map.unmodifiable({
-        for (final MapEntry(:key, :value)
-            in (json['zoneShares'] as JsonMap).entries)
-          ?_zone(key): (value as num).toDouble(),
-      }),
-      weapons: {
-        for (final exposure
-            in (json['weapons'] as List)
-                .cast<JsonMap>()
-                .map(_decodeExposure)
-                .nonNulls)
-          exposure.type: exposure,
-      },
-    ),
-  );
+    };
+    if (mutation == null) return null;
+    return EvolutionStep(
+      mutation: mutation,
+      zoneShare: (json['zoneShare'] as num).toDouble(),
+    );
+  }
+
+  static IntelReport _decodeReport(JsonMap json, BossLineage lineage) =>
+      IntelReport(
+        sequence: json['sequence'] as int,
+        bossId: switch (json['bossId'] as String?) {
+          final id? when lineage.contains(id) => id,
+          _ => null,
+        },
+        profile: WeaponExposureProfile(
+          weakPointFocus: (json['weakPointFocus'] as num?)?.toDouble(),
+          zoneShares: Map.unmodifiable({
+            for (final MapEntry(:key, :value)
+                in (json['zoneShares'] as JsonMap).entries)
+              ?_zone(key): (value as num).toDouble(),
+          }),
+          weapons: {
+            for (final exposure
+                in (json['weapons'] as List)
+                    .cast<JsonMap>()
+                    .map(_decodeExposure)
+                    .nonNulls)
+              exposure.type: exposure,
+          },
+        ),
+      );
 
   static WeaponExposure? _decodeExposure(JsonMap json) {
     final type = _weaponType(json['type']);
@@ -263,19 +377,21 @@ class SaveGameCodec {
     );
   }
 
-  static PlayerProgress _decodeProgress(JsonMap json) {
+  static PlayerProgress _decodeProgress(JsonMap json, BossLineage lineage) {
     final lastBattle = json['lastBattle'] as JsonMap?;
     return PlayerProgress(
       battlesFought: json['battlesFought'] as int,
-      foughtBossIds: _knownBossIds(json['foughtBossIds']),
-      defeatedBossIds: _knownBossIds(json['defeatedBossIds']),
-      lastBattle: lastBattle == null ? null : _decodeRecord(lastBattle),
+      foughtBossIds: _knownBossIds(json['foughtBossIds'], lineage),
+      defeatedBossIds: _knownBossIds(json['defeatedBossIds'], lineage),
+      lastBattle: lastBattle == null
+          ? null
+          : _decodeRecord(lastBattle, lineage),
     );
   }
 
-  static BattleRecord? _decodeRecord(JsonMap json) {
+  static BattleRecord? _decodeRecord(JsonMap json, BossLineage lineage) {
     final bossId = json['bossId'] as String;
-    if (BossCatalog.byId(bossId) == null) return null;
+    if (!lineage.contains(bossId)) return null;
     final stats = json['stats'] as JsonMap;
     return BattleRecord(
       bossId: bossId,
@@ -309,10 +425,11 @@ class SaveGameCodec {
 
   static List<String> _strings(Object? json) => (json as List).cast<String>();
 
-  static Set<String> _knownBossIds(Object? json) => Set.unmodifiable({
-    for (final id in _strings(json))
-      if (BossCatalog.byId(id) != null) id,
-  });
+  static Set<String> _knownBossIds(Object? json, BossLineage lineage) =>
+      Set.unmodifiable({
+        for (final id in _strings(json))
+          if (lineage.contains(id)) id,
+      });
 
   static WeaponType? _weaponType(Object? name) =>
       _enum(WeaponType.values, name);

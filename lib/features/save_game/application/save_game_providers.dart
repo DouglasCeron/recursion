@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 import '../../boss_evolution/application/boss_intel_controller.dart';
+import '../../boss_evolution/application/boss_lineage_controller.dart';
 import '../../inventory/application/inventory_controller.dart';
 import '../../progression/application/progress_controller.dart';
 import '../domain/save_game.dart';
@@ -22,11 +23,13 @@ final currentSaveGameProvider = Provider<SaveGame>((ref) {
     loadout: inventory.loadout,
     intel: ref.watch(bossIntelControllerProvider),
     progress: ref.watch(progressControllerProvider),
+    lineage: ref.watch(bossLineageControllerProvider),
   );
 });
 
 /// Writes the save whenever persisted state changes: collecting an item,
-/// equipping a weapon, receiving intel or finishing a battle.
+/// equipping a weapon, receiving intel, or finishing a battle (which also
+/// grows the boss lineage).
 ///
 /// It must be *listened* for as long as the app runs: Riverpod pauses the
 /// `ref.listen` of a provider that is only read.
@@ -36,13 +39,14 @@ final autosaveProvider = Provider<Autosave>((ref) {
   return autosave;
 });
 
-/// Wipes inventory, intel and progress back to a new game. Autosave then
+/// Wipes inventory, intel, progress and the boss lineage back to a new game. Autosave then
 /// replaces the stored save.
 final resetGameProvider = Provider<void Function()>(
   (ref) => () {
     ref.read(inventoryControllerProvider.notifier).reset();
     ref.read(bossIntelControllerProvider.notifier).reset();
     ref.read(progressControllerProvider.notifier).reset();
+    ref.read(bossLineageControllerProvider.notifier).reset();
   },
 );
 
@@ -53,6 +57,7 @@ List<Override> restoreOverrides(SaveGame game) => [
   ),
   initialBossIntelProvider.overrideWithValue(game.intel),
   initialProgressProvider.overrideWithValue(game.progress),
+  initialBossLineageProvider.overrideWithValue(game.lineage),
 ];
 
 /// Serializes writes so an older save can never land after a newer one.

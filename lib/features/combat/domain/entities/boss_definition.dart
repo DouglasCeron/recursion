@@ -19,7 +19,8 @@ class BossComponentDefinition {
     required this.height,
     this.dropItemId,
     this.coveredBy = const [],
-    this.reinforced = false,
+    this.armorLevel = 1,
+    this.evolved = false,
   });
 
   /// Parts at most this far from the boss center belong to the center zone.
@@ -41,8 +42,12 @@ class BossComponentDefinition {
   /// part are absorbed by the first one still standing.
   final List<String> coveredBy;
 
-  /// Whether this part was strengthened by a zone reinforcement.
-  final bool reinforced;
+  /// Armor level of an armor or hull part, starting at 1. Each level above 1
+  /// comes from a boss evolution.
+  final int armorLevel;
+
+  /// Whether a boss evolution added or changed this part.
+  final bool evolved;
 
   BossZone get zone => switch (offsetX) {
     < -centerZoneHalfWidth => BossZone.left,
@@ -59,7 +64,8 @@ class BossComponentDefinition {
     String? id,
     int? maxIntegrity,
     List<String>? coveredBy,
-    bool? reinforced,
+    int? armorLevel,
+    bool? evolved,
   }) => BossComponentDefinition(
     id: id ?? this.id,
     name: name,
@@ -71,7 +77,8 @@ class BossComponentDefinition {
     height: height,
     dropItemId: dropItemId,
     coveredBy: coveredBy ?? this.coveredBy,
-    reinforced: reinforced ?? this.reinforced,
+    armorLevel: armorLevel ?? this.armorLevel,
+    evolved: evolved ?? this.evolved,
   );
 }
 

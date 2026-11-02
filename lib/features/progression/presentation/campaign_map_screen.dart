@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../combat/domain/content/boss_catalog.dart';
+import '../../boss_evolution/application/boss_lineage_controller.dart';
+import '../../boss_evolution/domain/boss_lineage.dart';
 import '../application/progress_controller.dart';
 import '../domain/player_progress.dart';
 
@@ -16,28 +17,38 @@ class CampaignNode {
     required this.status,
   });
 
-  final String bossId;
+  /// Null for the locked boss that does not exist yet.
+  final String? bossId;
   final String name;
   final int number;
   final CampaignNodeStatus status;
 
   bool get isPlayable => status != CampaignNodeStatus.locked;
 
-  static List<CampaignNode> fromProgress(PlayerProgress progress) => [
-    for (final (index, bossId) in CampaignRules.order.indexed)
+  /// Every boss of the lineage, then one locked node: the next boss is only
+  /// generated once the latest one has been fought.
+  static List<CampaignNode> fromProgress(
+    PlayerProgress progress,
+    BossLineage lineage,
+  ) => [
+    for (final (index, bossId) in lineage.bossIds.indexed)
       CampaignNode(
         bossId: bossId,
-        name: BossCatalog.byId(bossId)!.name,
+        name: lineage.nameOf(index + 1),
         number: index + 1,
         status: switch (bossId) {
           _ when progress.isBossDefeated(bossId) => CampaignNodeStatus.defeated,
           _ when progress.foughtBossIds.contains(bossId) =>
             CampaignNodeStatus.fought,
-          _ when progress.isBossUnlocked(bossId) =>
-            CampaignNodeStatus.available,
-          _ => CampaignNodeStatus.locked,
+          _ => CampaignNodeStatus.available,
         },
       ),
+    CampaignNode(
+      bossId: null,
+      name: '???',
+      number: lineage.length + 1,
+      status: CampaignNodeStatus.locked,
+    ),
   ];
 }
 
@@ -54,6 +65,7 @@ class CampaignMapScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final nodes = CampaignNode.fromProgress(
       ref.watch(progressControllerProvider),
+      ref.watch(bossLineageControllerProvider),
     );
     return Scaffold(
       appBar: AppBar(title: const Text('Campaign')),
@@ -86,9 +98,10 @@ class CampaignMapScreen extends ConsumerWidget {
                       child: _NodeView(
                         node: node,
                         size: _nodeSize,
-                        onTap: node.isPlayable
-                            ? () => onBossSelected(node.bossId)
-                            : null,
+                        onTap: switch (node.bossId) {
+                          final id? => () => onBossSelected(id),
+                          null => null,
+                        },
                       ),
                     ),
                 ],
@@ -123,7 +136,7 @@ class _NodeView extends StatelessWidget {
     return Column(
       children: [
         Material(
-          key: Key('campaign.node.${node.bossId}'),
+          key: Key('campaign.node.${node.bossId ?? 'next'}'),
           color: Theme.of(context).scaffoldBackgroundColor,
           shape: CircleBorder(side: BorderSide(color: color, width: 3)),
           child: InkWell(

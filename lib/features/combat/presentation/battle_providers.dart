@@ -1,38 +1,32 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../boss_evolution/application/boss_intel_controller.dart';
-import '../../boss_evolution/domain/boss_evolution.dart';
+import '../../boss_evolution/application/boss_lineage_controller.dart';
+import '../../boss_evolution/domain/boss_lineage.dart';
 import '../../inventory/application/inventory_controller.dart';
 import '../../progression/application/progress_controller.dart';
 import '../../ship/domain/weapon_catalog.dart';
 import '../application/battle_session.dart';
-import '../domain/content/boss_catalog.dart';
 import '../domain/entities/battle_state.dart';
-import '../domain/entities/boss_definition.dart';
-import '../domain/entities/boss_modifiers.dart';
 import '../domain/entities/boss_state.dart';
 import '../domain/entities/dropped_item.dart';
 import '../domain/events/battle_event.dart';
 
-/// A battle against the boss with the given id, using the currently equipped
-/// weapon. Adaptive bosses receive the countermeasures derived from enemy
-/// intel at the moment the battle is created.
+/// A battle against the boss with the given id from the campaign lineage
+/// (the latest boss for unknown ids), using the currently equipped weapon.
 ///
 /// Collected drops are added to the inventory as soon as the battle confirms
-/// the pickup; observer transmissions reach the enemy intel and the battle is
-/// recorded in the player's progress when it ends.
+/// the pickup; observer transmissions reach the enemy intel. When the battle
+/// ends it is recorded in the player's progress, and fighting the latest
+/// boss evolves the next one from what the observer transmitted.
 final battleSessionProvider = Provider.autoDispose
     .family<BattleSession, String>((ref, bossId) {
-      final boss = BossCatalog.byId(bossId) ?? BossCatalog.sentinel;
+      final lineage = ref.read(bossLineageControllerProvider);
+      final boss =
+          lineage.definitionOf(bossId) ??
+          lineage.definitionOf(lineage.latestId)!;
       final weapon = ref.read(inventoryControllerProvider).equippedWeapon;
-      final modifiers = AdaptationRules.adaptiveBossIds.contains(boss.id)
-          ? ref.read(bossEvolutionProvider(boss.id)).toModifiers()
-          : BossModifiers.none;
-      final session = BattleSession.boss(
-        boss: boss,
-        modifiers: modifiers,
-        weapon: weapon,
-      );
+      final session = BattleSession.boss(boss: boss, weapon: weapon);
       final subscription = session.events.listen((event) {
         switch (event) {
           case ItemCollected():
@@ -47,6 +41,14 @@ final battleSessionProvider = Provider.autoDispose
             ref
                 .read(progressControllerProvider.notifier)
                 .recordBattle(session.state.record);
+            ref
+                .read(bossLineageControllerProvider.notifier)
+                .onBattleCompleted(
+                  boss.id,
+                  session.state.intelTransmitted
+                      ? ref.read(bossIntelControllerProvider).latest
+                      : null,
+                );
           default:
             break;
         }
@@ -83,7 +85,7 @@ class BattleHudState {
     required this.weaponDamageMultiplier,
     required this.coreWindowOpenDuration,
     required this.coreWindowShortened,
-    required this.reinforcedZone,
+    required this.evolutions,
   });
 
   factory BattleHudState.fromBattle(BattleState battle) {
@@ -123,7 +125,7 @@ class BattleHudState {
       ),
       coreWindowOpenDuration: boss.coreWindow.openDuration,
       coreWindowShortened: boss.modifiers.coreWindowOpenDuration != null,
-      reinforcedZone: boss.modifiers.reinforcement?.zone,
+      evolutions: evolutionSummary(boss.definition),
     );
   }
 
@@ -157,7 +159,9 @@ class BattleHudState {
   final double weaponDamageMultiplier;
   final double coreWindowOpenDuration;
   final bool coreWindowShortened;
-  final BossZone? reinforcedZone;
+
+  /// Evolutions this boss carries, e.g. `left armor Lv2`.
+  final List<String> evolutions;
 
   double get hullRatio => hull / maxHull;
   double get bossIntegrityRatio => bossIntegrity / bossMaxIntegrity;

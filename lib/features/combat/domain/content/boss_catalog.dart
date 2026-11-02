@@ -3,10 +3,7 @@ import '../entities/boss_definition.dart';
 import '../rules/escape_rule.dart';
 import '../rules/vulnerability_window.dart';
 
-/// Static boss content available in the prototype.
-///
-/// Each boss is an evolution of the previous one: it starts from the same
-/// frame and only differs by the reinforcements earned from enemy intel.
+/// Static base boss content.
 abstract final class BossCatalog {
   /// First and simplest boss. The armor plate covers the core, and the cannon
   /// sits in front of the armor, so players break through the front parts
@@ -87,44 +84,14 @@ abstract final class BossCatalog {
     enragedDriftSpeed: 1.1,
   );
 
-  /// Second boss: the Sentinel rebuilt. Same frame and numbers; its armor is
-  /// reinforced where the player hit the Sentinel the most.
-  static final sentinelMk2 = evolve(
-    sentinel,
-    id: 'boss.sentinel_mk2',
-    name: 'Sentinel Mk II',
-    partPrefix: 'sentinel_mk2',
-  );
-
-  static final all = [sentinel, sentinelMk2];
+  /// Bosses every campaign lineage can start from. Later bosses are not
+  /// listed here: they are evolutions generated from the battles fought.
+  static const all = [sentinel];
 
   static BossDefinition? byId(String id) {
     for (final boss in all) {
       if (boss.id == id) return boss;
     }
     return null;
-  }
-
-  /// A copy of [base] with its own id, name and part ids: every part id
-  /// `<old prefix>.<name>` becomes `<partPrefix>.<name>`.
-  static BossDefinition evolve(
-    BossDefinition base, {
-    required String id,
-    required String name,
-    required String partPrefix,
-  }) {
-    String rename(String partId) =>
-        '$partPrefix.${partId.substring(partId.indexOf('.') + 1)}';
-    return base.copyWith(
-      id: id,
-      name: name,
-      components: [
-        for (final part in base.components)
-          part.copyWith(
-            id: rename(part.id),
-            coveredBy: [for (final cover in part.coveredBy) rename(cover)],
-          ),
-      ],
-    );
   }
 }

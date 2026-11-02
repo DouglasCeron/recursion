@@ -34,39 +34,30 @@ typedef BossUpdate = ({List<BattleEvent> events, List<EnemyShot> shots});
 
 /// Authoritative runtime state of a boss and its destructible parts.
 class BossState {
-  /// [definition] is the catalog boss; [BossState.definition] is the one
-  /// actually fought, including any zone reinforcement from [modifiers].
   BossState({
-    required BossDefinition definition,
-    required ArenaBounds arena,
-    BossModifiers modifiers = BossModifiers.none,
-  }) : this._(
-         modifiers.reinforcement?.applyTo(definition) ?? definition,
-         arena,
-         modifiers,
-       );
-
-  BossState._(this.definition, this.arena, this.modifiers)
-    : y = arena.height * definition.verticalPosition,
-      coreWindow = modifiers.coreWindowOpenDuration == null
-          ? definition.coreWindow
-          : VulnerabilityWindow(
-              period: definition.coreWindow.period,
-              openDuration: math.min(
-                modifiers.coreWindowOpenDuration!,
-                definition.coreWindow.period,
-              ),
-            ),
-      _x = arena.width / 2,
-      _attackCooldown = definition.initialAttackDelay,
-      _components = {
-        for (final c in definition.components)
-          c.id: BossComponentState(
-            id: c.id,
-            kind: c.kind,
-            maxIntegrity: c.maxIntegrity,
-          ),
-      };
+    required this.definition,
+    required this.arena,
+    this.modifiers = BossModifiers.none,
+  }) : y = arena.height * definition.verticalPosition,
+       coreWindow = modifiers.coreWindowOpenDuration == null
+           ? definition.coreWindow
+           : VulnerabilityWindow(
+               period: definition.coreWindow.period,
+               openDuration: math.min(
+                 modifiers.coreWindowOpenDuration!,
+                 definition.coreWindow.period,
+               ),
+             ),
+       _x = arena.width / 2,
+       _attackCooldown = definition.initialAttackDelay,
+       _components = {
+         for (final c in definition.components)
+           c.id: BossComponentState(
+             id: c.id,
+             kind: c.kind,
+             maxIntegrity: c.maxIntegrity,
+           ),
+       };
 
   final BossDefinition definition;
   final ArenaBounds arena;
