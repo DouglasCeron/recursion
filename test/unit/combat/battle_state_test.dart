@@ -364,6 +364,32 @@ void main() {
       expect(battle.intelTransmitted, isTrue);
     });
 
+    test('the observer reports a cannon only when it saw it fall', () {
+      final seen = newBattle(weapon: breaker);
+      seen.resolveHit(projectileId: fireOnce(seen), componentId: cannonId);
+      seen.resolveObserverHit(projectileId: fireOnce(seen));
+      seen.resolveHit(projectileId: fireOnce(seen), componentId: coreId);
+      final seenReport = seen
+          .resolveHit(projectileId: fireOnce(seen), componentId: coreId)
+          .whereType<ObserverTransmitted>()
+          .single;
+
+      expect(seenReport.stats.destroyedWeaponIds, [cannonId]);
+      expect(seen.record.stats.destroyedWeaponIds, [cannonId]);
+
+      final missed = newBattle(weapon: breaker);
+      missed.resolveObserverHit(projectileId: fireOnce(missed));
+      missed.resolveHit(projectileId: fireOnce(missed), componentId: cannonId);
+      missed.resolveHit(projectileId: fireOnce(missed), componentId: coreId);
+      final missedReport = missed
+          .resolveHit(projectileId: fireOnce(missed), componentId: coreId)
+          .whereType<ObserverTransmitted>()
+          .single;
+
+      expect(missedReport.stats.destroyedWeaponIds, isEmpty);
+      expect(missed.record.stats.destroyedWeaponIds, [cannonId]);
+    });
+
     test('transmits on defeat and escape too', () {
       final battle = newBattle();
       final events = <BattleEvent>[];

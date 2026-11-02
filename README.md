@@ -30,7 +30,7 @@ After the proof of concept:
 | 12 | Endless boss lineage: each boss evolves from the previous one (armor levels, extra plates) | Done |
 | 13 | Damage shown as part colors and cracks instead of integrity bars | Done |
 | 14 | Observer flees instead of dying and dodges hits; whole-boss critical flash; Next boss button | Done |
-| 15 | Weapon mutations: extra cannons where the boss lost one | Planned |
+| 15 | Weapon mutations: a destroyed cannon comes back as two | Done |
 | 16 | Enemy laser and missile as evolutions after two cannons | Planned |
 | 17 | Richer observer (ship position, destruction order) | Planned |
 
@@ -254,6 +254,15 @@ the left side can reach boss 5 with only the left side upgraded.
 - **Extra plate:** one armor plate (80 integrity) just below the zone,
   spanning its parts. It covers every part of the zone that had no cover, so
   it has to break first. One per zone; later armor upgrades raise it too.
+- **Cannon split:** when the observer saw one of this boss's cannons
+  destroyed, the next boss replaces its single cannon with two. They go on
+  the most hit side, or one under each wing when the center was hit most (or
+  when the observer fled before seeing any zone). This reserves one of the 3
+  mutation slots and is applied last, so the new cannons are not covered by
+  a plate added in the same generation. A boss never grows past two cannons,
+  and only one of them drops the Heavy Cannon. They take turns firing the
+  aimed shot, so the rate of fire stays the same; the burst replaces aimed
+  fire only once both are destroyed.
 - Evolved parts get an orange outline in battle and one inner line per
   armor level above 1. The HUD lists the evolutions the boss carries, and
   the briefing explains each new mutation with the share of damage that
@@ -270,7 +279,7 @@ Inventory, equipped weapon, enemy intel, progress (battles fought, bosses
 fought and defeated, last battle record) and the boss lineage survive an app
 restart.
 
-- Stored as one JSON document with a `schemaVersion` (currently 6) in
+- Stored as one JSON document with a `schemaVersion` (currently 7) in
   `shared_preferences`, behind the `SaveRepository` interface
   (`lib/features/save_game/`). Tests use `InMemorySaveRepository`, which goes
   through the same JSON codec.
@@ -294,20 +303,23 @@ restart.
   `boss.sentinel.gen2`). Each one that was fought gets its next generation,
   evolved from its latest report. `migrations[5]` upgrades v5 to v6: the
   last battle's `observerDestroyed` becomes `observerFled`.
+  `migrations[6]` upgrades v6 to v7 by adding the boss weapons each report
+  and battle saw destroyed: older ones saw none, so no cannon evolves from
+  them.
 - Features do not know about saving: each controller starts from an
   `initial...Provider` that the app overrides with the restored save.
 
 ## Known limitations
 
-- Prototype content only: one base boss, two mutation kinds and two player
+- Prototype content only: one base boss, three mutation kinds and two player
   weapons (Missile and Laser types exist in the domain but have no content
   yet; enemy lasers and missiles are planned as evolutions).
 - The Sentinel concentrates most of its integrity in the center (670 of 740),
   so a battle that ends in victory or escape almost always evolves the
   center. The sides only evolve after battles that spend a lot of fire on a
   wing.
-- Mutations only add armor for now; the boss's weapons and attacks do not
-  evolve yet.
+- A boss stops at two cannons. A different weapon (laser, missile) after
+  that is not built yet.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.

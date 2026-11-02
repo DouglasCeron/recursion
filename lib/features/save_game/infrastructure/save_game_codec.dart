@@ -32,7 +32,7 @@ class SaveGameCodec {
     this.migrations = defaultMigrations,
   });
 
-  static const currentVersion = 6;
+  static const currentVersion = 7;
 
   /// Keyed by the version they upgrade from: `migrations[1]` turns a v1
   /// document into a v2 one.
@@ -42,7 +42,38 @@ class SaveGameCodec {
     3: _addReportBoss,
     4: _addLineage,
     5: _renameObserverDestroyed,
+    6: _addDestroyedWeapons,
   };
+
+  /// v7 records the boss weapons the observer saw destroyed. Older reports
+  /// and battles saw none, so no cannon evolves from them.
+  static JsonMap _addDestroyedWeapons(JsonMap document) {
+    final intel = document['intel'] as JsonMap;
+    final progress = document['progress'] as JsonMap;
+    final lastBattle = progress['lastBattle'] as JsonMap?;
+    JsonMap? withWeapons(JsonMap? record) {
+      if (record == null) return null;
+      return {
+        ...record,
+        'stats': {
+          ...record['stats'] as JsonMap,
+          'destroyedWeapons': <Object?>[],
+        },
+      };
+    }
+
+    return {
+      ...document,
+      'intel': {
+        ...intel,
+        'reports': [
+          for (final report in (intel['reports'] as List).cast<JsonMap>())
+            {...report, 'destroyedWeapons': <Object?>[]},
+        ],
+      },
+      'progress': {...progress, 'lastBattle': withWeapons(lastBattle)},
+    };
+  }
 
   /// v6: the observer flees instead of being destroyed, and still transmits
   /// what it saw. Older records keep their value under the new name.
@@ -227,6 +258,7 @@ class SaveGameCodec {
           'mutation': switch (step.mutation) {
             ArmorUpgrade() => 'armorUpgrade',
             ExtraPlate() => 'extraPlate',
+            CannonSplit() => 'cannonSplit',
           },
           'zone': step.mutation.zone.name,
           'zoneShare': step.zoneShare,
@@ -253,6 +285,7 @@ class SaveGameCodec {
           'level': w.level.name,
         },
     ],
+    'destroyedWeapons': report.profile.destroyedWeaponIds,
   };
 
   static JsonMap _encodeProgress(PlayerProgress progress) => {
@@ -287,6 +320,7 @@ class SaveGameCodec {
             in record.stats.zoneDamage.entries)
           zone.name: damage,
       },
+      'destroyedWeapons': record.stats.destroyedWeaponIds,
     },
     'destroyedComponentIds': record.destroyedComponentIds,
     'collectedItemIds': record.collectedItemIds,
@@ -346,6 +380,7 @@ class SaveGameCodec {
     final BossMutation? mutation = switch (json['mutation']) {
       'armorUpgrade' => ArmorUpgrade(zone),
       'extraPlate' => ExtraPlate(zone),
+      'cannonSplit' => CannonSplit(zone),
       _ => null,
     };
     if (mutation == null) return null;
@@ -369,6 +404,9 @@ class SaveGameCodec {
                 in (json['zoneShares'] as JsonMap).entries)
               ?_zone(key): (value as num).toDouble(),
           }),
+          destroyedWeaponIds: List.unmodifiable(
+            _optionalStrings(json['destroyedWeapons']),
+          ),
           weapons: {
             for (final exposure
                 in (json['weapons'] as List)
@@ -428,6 +466,9 @@ class SaveGameCodec {
               in (stats['zoneDamage'] as JsonMap).entries)
             ?_zone(key): value as int,
         }),
+        destroyedWeaponIds: List.unmodifiable(
+          _optionalStrings(stats['destroyedWeapons']),
+        ),
       ),
       destroyedComponentIds: List.unmodifiable(
         _strings(json['destroyedComponentIds']),
@@ -439,6 +480,12 @@ class SaveGameCodec {
   }
 
   static List<String> _strings(Object? json) => (json as List).cast<String>();
+
+  /// Like [_strings], but a missing field is an empty list. Saves written
+  /// before destroyed weapons were tracked omit it, and a migration reads
+  /// them before the field is added.
+  static List<String> _optionalStrings(Object? json) =>
+      json == null ? const [] : _strings(json);
 
   static Set<String> _knownBossIds(Object? json, BossLineage lineage) =>
       Set.unmodifiable({

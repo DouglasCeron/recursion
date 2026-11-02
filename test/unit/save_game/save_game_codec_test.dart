@@ -25,6 +25,7 @@ const stats = CombatStats(
   coreDamage: 400,
   coreDamageWhileExposed: 260,
   zoneDamage: {BossZone.center: 450, BossZone.left: 150},
+  destroyedWeaponIds: ['sentinel.cannon'],
 );
 
 SaveGame sampleGame() {
@@ -60,6 +61,7 @@ SaveGame sampleGame() {
             zoneShare: 0.75,
           ),
           EvolutionStep(mutation: ExtraPlate(BossZone.center), zoneShare: 0.75),
+          EvolutionStep(mutation: CannonSplit(BossZone.left), zoneShare: 0.25),
         ],
       ),
     ),
@@ -92,6 +94,7 @@ void main() {
       BossZone.center: 0.75,
       BossZone.left: 0.25,
     });
+    expect(report.profile.destroyedWeaponIds, ['sentinel.cannon']);
     for (final type in original.weapons.keys) {
       final restored = report.profile.weapons[type]!;
       expect(restored.level, original.weapons[type]!.level);
@@ -107,6 +110,7 @@ void main() {
     expect(record.duration, 42.5);
     expect(record.stats.weapons[WeaponType.heavyCannon]!.hits, 9);
     expect(record.stats.coreDamageWhileExposed, 260);
+    expect(record.stats.destroyedWeaponIds, ['sentinel.cannon']);
     expect(record.stats.zoneDamage, {BossZone.center: 450, BossZone.left: 150});
     expect(record.destroyedComponentIds, hasLength(2));
     expect(record.intelTransmitted, isTrue);
@@ -192,6 +196,7 @@ void main() {
     expect(generation.steps.map((s) => s.mutation), [
       isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.center),
       isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.center),
+      isA<CannonSplit>().having((m) => m.zone, 'zone', BossZone.left),
     ]);
     expect(generation.steps.first.zoneShare, 0.75);
   });
@@ -237,10 +242,24 @@ void main() {
   });
 
   group('migrations', () {
-    /// The v5 document an earlier release would have written for [game]:
-    /// the observer could be destroyed instead of fleeing.
-    Map<String, Object?> v5DocumentOf(SaveGame game) {
+    /// The v6 document an earlier release would have written for [game]:
+    /// reports and battles do not know which boss weapons were destroyed.
+    Map<String, Object?> v6DocumentOf(SaveGame game) {
       final document = documentOf(game);
+      for (final report in ((document['intel'] as Map)['reports'] as List)) {
+        (report as Map).remove('destroyedWeapons');
+      }
+      final stats =
+          ((document['progress'] as Map)['lastBattle'] as Map?)?['stats']
+              as Map?;
+      stats?.remove('destroyedWeapons');
+      return {...document, 'schemaVersion': 6};
+    }
+
+    /// The v5 document: v6 where the observer could be destroyed instead of
+    /// fleeing.
+    Map<String, Object?> v5DocumentOf(SaveGame game) {
+      final document = v6DocumentOf(game);
       final lastBattle = (document['progress'] as Map)['lastBattle'] as Map?;
       if (lastBattle != null) {
         lastBattle['observerDestroyed'] = lastBattle.remove('observerFled');
@@ -253,6 +272,13 @@ void main() {
       final document = v5DocumentOf(game)..remove('lineage');
       return {...document, 'schemaVersion': 4};
     }
+
+    test('v6 saves load with no destroyed weapons', () {
+      final game = codec.decode(jsonEncode(v6DocumentOf(sampleGame()))).game;
+
+      expect(game.intel.latest!.profile.destroyedWeaponIds, isEmpty);
+      expect(game.progress.lastBattle!.stats.destroyedWeaponIds, isEmpty);
+    });
 
     test('v5 records keep whether the observer was destroyed, as fled', () {
       final lost = codec

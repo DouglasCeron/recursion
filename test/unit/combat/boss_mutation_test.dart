@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:recursion/core/geometry/arena_bounds.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_state.dart';
 import 'package:recursion/features/combat/domain/entities/boss_component_state.dart';
 import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/entities/boss_mutation.dart';
@@ -78,6 +80,65 @@ void main() {
 
       expect(plate.canApply(boss), isFalse);
       expect(plate.applyTo(boss).components, hasLength(6));
+    });
+  });
+
+  group('CannonSplit', () {
+    test('puts both cannons on the given side and keeps a single drop', () {
+      final boss = const CannonSplit(BossZone.left).applyTo(sentinel);
+      final cannons = [
+        for (final part in boss.components)
+          if (part.kind == BossComponentKind.cannon) part,
+      ];
+
+      expect(boss.components.where((c) => c.id == 'sentinel.cannon'), isEmpty);
+      expect(cannons.map((c) => c.zone), [BossZone.left, BossZone.left]);
+      expect(cannons.map((c) => c.id), [
+        'evolved.cannon_left_inner',
+        'evolved.cannon_left_outer',
+      ]);
+      expect(cannons.where((c) => c.dropItemId != null), hasLength(1));
+      expect(
+        cannons.singleWhere((c) => c.dropItemId != null).id,
+        'evolved.cannon_left_inner',
+      );
+      expect(cannons.every((c) => c.evolved), isTrue);
+      expect(cannons.every((c) => c.maxIntegrity == 100), isTrue);
+    });
+
+    test('a center split spreads the cannons under the two wings', () {
+      final boss = const CannonSplit(BossZone.center).applyTo(sentinel);
+      final cannons = [
+        for (final part in boss.components)
+          if (part.kind == BossComponentKind.cannon) part,
+      ];
+
+      expect(cannons.map((c) => c.zone), [BossZone.left, BossZone.right]);
+      expect(cannons.map((c) => c.offsetX), containsAll([-76, 76]));
+    });
+
+    test('stops at two cannons', () {
+      const split = CannonSplit(BossZone.left);
+      final boss = split.applyTo(sentinel);
+
+      expect(split.canApply(boss), isFalse);
+      expect(split.applyTo(boss).components, boss.components);
+    });
+
+    test('the two cannons take turns firing, at the original rate', () {
+      final boss = BossState(
+        definition: const CannonSplit(BossZone.center).applyTo(sentinel),
+        arena: ArenaBounds.standard,
+      );
+      final origins = <double>[];
+      for (final step in [1.5, 1.2, 1.2, 1.2]) {
+        final update = boss.update(step, targetX: 180, targetY: 500);
+        origins.addAll(update.shots.map((shot) => shot.originX - boss.x));
+      }
+
+      expect(origins, hasLength(4));
+      expect(origins.toSet(), {-76, 76});
+      expect(origins[0], isNot(origins[1]));
     });
   });
 }

@@ -112,3 +112,80 @@ class ExtraPlate extends BossMutation {
     );
   }
 }
+
+/// Replaces the boss's single cannon with two. [zone] `center` spreads them
+/// under the two wings; `left` or `right` puts both on that side. One of them
+/// keeps the original cannon's drop, so a boss still yields one item. A boss
+/// never ends up with more than [maxCannons] cannons.
+class CannonSplit extends BossMutation {
+  const CannonSplit(super.zone);
+
+  static const maxCannons = 2;
+
+  /// Gap between the two cannons of a same-side pair, on top of their width.
+  static const gap = 6.0;
+
+  List<BossComponentDefinition> _cannons(BossDefinition boss) => [
+    for (final c in boss.components)
+      if (c.kind == BossComponentKind.cannon) c,
+  ];
+
+  @override
+  bool canApply(BossDefinition boss) => _cannons(boss).length == 1;
+
+  @override
+  BossDefinition applyTo(BossDefinition boss) {
+    if (!canApply(boss)) return boss;
+    final source = _cannons(boss).single;
+    final spots = _spots(boss, source);
+    final keepsDrop = spots.reduce((a, b) => a.x.abs() <= b.x.abs() ? a : b);
+    return boss.copyWith(
+      components: [
+        for (final c in boss.components)
+          if (c.kind != BossComponentKind.cannon) c,
+        for (final spot in spots)
+          BossComponentDefinition(
+            id: spot.id,
+            name: 'Cannon',
+            kind: BossComponentKind.cannon,
+            maxIntegrity: source.maxIntegrity,
+            offsetX: spot.x,
+            offsetY: source.offsetY,
+            width: source.width,
+            height: source.height,
+            dropItemId: spot == keepsDrop ? source.dropItemId : null,
+            evolved: true,
+          ),
+      ],
+    );
+  }
+
+  /// Where the wing of [zone] sits, or a fixed offset when it has none.
+  double _anchor(BossDefinition boss, BossZone zone) {
+    for (final part in boss.components) {
+      if (part.kind == BossComponentKind.hull && part.zone == zone) {
+        return part.offsetX;
+      }
+    }
+    return zone == BossZone.left ? -76 : 76;
+  }
+
+  List<({String id, double x})> _spots(
+    BossDefinition boss,
+    BossComponentDefinition source,
+  ) {
+    if (zone == BossZone.center) {
+      return [
+        (id: 'evolved.cannon_left', x: _anchor(boss, BossZone.left)),
+        (id: 'evolved.cannon_right', x: _anchor(boss, BossZone.right)),
+      ];
+    }
+    final half = (source.width + gap) / 2;
+    final anchor = _anchor(boss, zone);
+    final inward = zone == BossZone.left ? half : -half;
+    return [
+      (id: 'evolved.cannon_${zone.name}_inner', x: anchor + inward),
+      (id: 'evolved.cannon_${zone.name}_outer', x: anchor - inward),
+    ];
+  }
+}

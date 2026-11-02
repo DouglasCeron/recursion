@@ -32,6 +32,7 @@ class WeaponExposureProfile {
     required this.weapons,
     required this.weakPointFocus,
     this.zoneShares = const {},
+    this.destroyedWeaponIds = const [],
   });
 
   factory WeaponExposureProfile.fromStats(CombatStats stats) {
@@ -58,6 +59,7 @@ class WeaponExposureProfile {
       weakPointFocus: stats.coreDamage == 0
           ? null
           : stats.coreDamageWhileExposed / stats.coreDamage,
+      destroyedWeaponIds: stats.destroyedWeaponIds,
     );
   }
 
@@ -80,6 +82,9 @@ class WeaponExposureProfile {
   /// Fraction (0..1) of the damage dealt to boss parts that landed in each
   /// zone. Zones never hit are absent.
   final Map<BossZone, double> zoneShares;
+
+  /// Boss weapons the observer saw destroyed, in the order they fell.
+  final List<String> destroyedWeaponIds;
 
   bool get exploitsWeakPoint =>
       (weakPointFocus ?? 0) >= weakPointExploitThreshold;

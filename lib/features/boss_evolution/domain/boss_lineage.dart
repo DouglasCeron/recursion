@@ -1,4 +1,5 @@
 import '../../combat/domain/content/boss_catalog.dart';
+import '../../combat/domain/entities/boss_component_state.dart';
 import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/boss_mutation.dart';
 
@@ -15,6 +16,14 @@ List<String> evolutionSummary(BossDefinition boss) => [
     if (boss.components.any((c) => c.id == ExtraPlate(zone).plateId))
       '${zone.name} extra plate',
   ],
+  ...switch (boss.components.where((c) => c.kind == BossComponentKind.cannon)) {
+    final cannons when cannons.length >= CannonSplit.maxCannons => [
+      cannons.map((c) => c.zone).toSet().length == 1
+          ? '${cannons.first.zone.name} twin cannons'
+          : 'cannons on both wings',
+    ],
+    _ => const <String>[],
+  },
 ];
 
 /// One mutation chosen for a generation, with the observed share of damage

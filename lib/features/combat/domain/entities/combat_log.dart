@@ -23,6 +23,7 @@ class CombatStats {
     required this.coreDamage,
     required this.coreDamageWhileExposed,
     this.zoneDamage = const {},
+    this.destroyedWeaponIds = const [],
   });
 
   static const empty = CombatStats(
@@ -41,6 +42,10 @@ class CombatStats {
   /// Damage dealt to boss parts in each zone. Zones never hit are absent.
   final Map<BossZone, int> zoneDamage;
 
+  /// Boss weapons destroyed while these stats were being recorded, in the
+  /// order they fell.
+  final List<String> destroyedWeaponIds;
+
   int get totalDamage => weapons.values.fold(0, (sum, w) => sum + w.damage);
 }
 
@@ -49,10 +54,15 @@ class CombatStats {
 class CombatLog {
   final Map<WeaponType, WeaponUsage> _weapons = {};
   final Map<BossZone, int> _zoneDamage = {};
+  final List<String> _destroyedWeapons = [];
   int _coreDamage = 0;
   int _coreDamageWhileExposed = 0;
 
   void recordShot(WeaponType type) => _update(type, shots: 1);
+
+  /// A boss weapon (a cannon) was destroyed.
+  void recordDestroyedWeapon(String componentId) =>
+      _destroyedWeapons.add(componentId);
 
   /// Records a hit; [zone] is the boss zone of the part that took it, or
   /// null for anything that is not a boss part.
@@ -75,6 +85,7 @@ class CombatLog {
     coreDamage: _coreDamage,
     coreDamageWhileExposed: _coreDamageWhileExposed,
     zoneDamage: Map.unmodifiable(_zoneDamage),
+    destroyedWeaponIds: List.unmodifiable(_destroyedWeapons),
   );
 
   void _update(WeaponType type, {int shots = 0, int hits = 0, int damage = 0}) {

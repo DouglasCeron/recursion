@@ -174,6 +174,10 @@ class BattleState {
     );
     for (final destroyed
         in events.whereType<BossComponentDestroyed>().toList()) {
+      if (destroyed.kind == BossComponentKind.cannon) {
+        _log.recordDestroyedWeapon(destroyed.componentId);
+        observer.observeDestroyedWeapon(destroyed.componentId);
+      }
       final itemId = boss.definition
           .component(destroyed.componentId)
           .dropItemId;

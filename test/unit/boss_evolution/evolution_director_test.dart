@@ -3,18 +3,23 @@ import 'package:recursion/features/boss_evolution/domain/boss_intel.dart';
 import 'package:recursion/features/boss_evolution/domain/evolution_director.dart';
 import 'package:recursion/features/boss_evolution/domain/weapon_exposure_profile.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_component_state.dart';
 import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/entities/boss_mutation.dart';
 
-IntelReport reportOf(Map<BossZone, double> shares, {int sequence = 1}) =>
-    IntelReport(
-      sequence: sequence,
-      profile: WeaponExposureProfile(
-        weapons: const {},
-        weakPointFocus: null,
-        zoneShares: shares,
-      ),
-    );
+IntelReport reportOf(
+  Map<BossZone, double> shares, {
+  int sequence = 1,
+  List<String> destroyedWeaponIds = const [],
+}) => IntelReport(
+  sequence: sequence,
+  profile: WeaponExposureProfile(
+    weapons: const {},
+    weakPointFocus: null,
+    zoneShares: shares,
+    destroyedWeaponIds: destroyedWeaponIds,
+  ),
+);
 
 List<(Type, BossZone)> mutationsOf(Iterable<BossMutation> mutations) => [
   for (final m in mutations) (m.runtimeType, m.zone),
@@ -84,6 +89,60 @@ void main() {
     expect(boss.component('sentinel.hull_left').armorLevel, 3);
     expect(boss.component('evolved.plate_left').armorLevel, 3);
     expect(boss.component('evolved.plate_left').maxIntegrity, 160);
+  });
+
+  test('a destroyed cannon takes one budget slot and goes to the most hit '
+      'side', () {
+    final generation = EvolutionDirector.next(
+      sentinel,
+      reportOf(
+        {BossZone.left: 0.8, BossZone.center: 0.2},
+        destroyedWeaponIds: ['sentinel.cannon'],
+      ),
+    );
+
+    expect(mutationsOf(generation.steps.map((s) => s.mutation)), [
+      (ArmorUpgrade, BossZone.left),
+      (ExtraPlate, BossZone.left),
+      (CannonSplit, BossZone.left),
+    ]);
+    final boss = generation.steps.fold(
+      sentinel,
+      (b, s) => s.mutation.applyTo(b),
+    );
+    expect(
+      boss.components
+          .where((c) => c.kind == BossComponentKind.cannon)
+          .map((c) => c.zone),
+      [BossZone.left, BossZone.left],
+    );
+  });
+
+  test('when the center was hit most, the cannons spread over the wings', () {
+    final generation = EvolutionDirector.next(
+      sentinel,
+      reportOf(
+        {BossZone.center: 0.6, BossZone.left: 0.4},
+        destroyedWeaponIds: ['sentinel.cannon'],
+      ),
+    );
+
+    expect(
+      generation.steps.last.mutation,
+      isA<CannonSplit>().having((m) => m.zone, 'zone', BossZone.center),
+    );
+  });
+
+  test('a cannon destroyed on another boss does not split this one', () {
+    final generation = EvolutionDirector.next(
+      sentinel,
+      reportOf({BossZone.left: 1}, destroyedWeaponIds: ['evolved.cannon_left']),
+    );
+
+    expect(
+      generation.steps.map((s) => s.mutation),
+      isNot(contains(isA<CannonSplit>())),
+    );
   });
 
   test('the same boss and report always give the same evolution', () {

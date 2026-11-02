@@ -52,6 +52,10 @@ class ObserverDrone {
   double get x => _x;
   double get y => _y;
 
+  void observeDestroyedWeapon(String componentId) {
+    if (!hasFled) _log.recordDestroyedWeapon(componentId);
+  }
+
   void observeShot(WeaponType type) {
     if (!hasFled) _log.recordShot(type);
   }

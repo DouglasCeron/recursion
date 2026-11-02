@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/boss_mutation.dart';
 import '../application/boss_lineage_controller.dart';
 import '../domain/boss_lineage.dart';
@@ -57,10 +58,7 @@ class BriefingScreen extends ConsumerWidget {
                 Card(
                   child: ListTile(
                     title: Text(_title(step.mutation)),
-                    subtitle: Text(
-                      'You dealt ${_percent(step.zoneShare)} of your damage '
-                      'to the ${step.mutation.zone.name} zone.',
-                    ),
+                    subtitle: Text(_reason(step)),
                   ),
                 ),
               if (carried.isNotEmpty) ...[
@@ -81,7 +79,22 @@ class BriefingScreen extends ConsumerWidget {
       'Armor upgraded in the ${zone.name} zone '
           '(+${_percent(ArmorUpgrade.integrityPerLevel)} of base integrity)',
     ExtraPlate(:final zone) => 'Extra plate in front of the ${zone.name} zone',
+    CannonSplit(:final zone) =>
+      zone == BossZone.center
+          ? 'Cannons spread across both wings'
+          : 'Twin cannons on the ${zone.name} side',
   };
+
+  static String _reason(EvolutionStep step) {
+    final where =
+        'You dealt ${_percent(step.zoneShare)} of your damage '
+        'to the ${step.mutation.zone.name} zone.';
+    return switch (step.mutation) {
+      CannonSplit() when step.zoneShare == 0 => 'You destroyed its cannon.',
+      CannonSplit() => 'You destroyed its cannon. $where',
+      _ => where,
+    };
+  }
 
   static String _percent(double fraction) => '${(fraction * 100).round()}%';
 }

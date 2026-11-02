@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:recursion/features/boss_evolution/application/boss_intel_controller.dart';
 import 'package:recursion/features/boss_evolution/application/boss_lineage_controller.dart';
 import 'package:recursion/features/combat/domain/content/boss_catalog.dart';
+import 'package:recursion/features/combat/domain/entities/boss_component_state.dart';
 import 'package:recursion/features/combat/domain/entities/boss_definition.dart';
 import 'package:recursion/features/combat/domain/entities/boss_mutation.dart';
 import 'package:recursion/features/combat/domain/events/battle_event.dart';
@@ -89,6 +90,27 @@ void main() {
     expect(lineage.length, 2);
     expect(lineage.generations.last.steps, isEmpty);
     expect(lineage.generations.last.basedOnReport, 1);
+  });
+
+  test('destroying the cannon spreads two cannons over the wings', () {
+    final container = newContainer();
+
+    playBattle(
+      container,
+      targetOrder: const ['sentinel.cannon', 'sentinel.core'],
+    );
+
+    final next = container
+        .read(bossLineageControllerProvider)
+        .definitionOf(_gen2)!;
+    final cannons = [
+      for (final part in next.components)
+        if (part.kind == BossComponentKind.cannon) part,
+    ];
+
+    expect(cannons.map((c) => c.zone), [BossZone.left, BossZone.right]);
+    expect(cannons.where((c) => c.dropItemId != null), hasLength(1));
+    expect(next.components.where((c) => c.id == 'sentinel.cannon'), isEmpty);
   });
 
   test('replaying an older boss does not grow the lineage', () {
