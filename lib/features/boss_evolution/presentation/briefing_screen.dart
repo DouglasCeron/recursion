@@ -83,6 +83,10 @@ class BriefingScreen extends ConsumerWidget {
       zone == BossZone.center
           ? 'Cannons spread across both wings'
           : 'Twin cannons on the ${zone.name} side',
+    WeaponUpgrade(:final faster) =>
+      faster ? 'Cannon fires faster' : 'Cannon hits harder',
+    WeaponReinforcement(:final zone) =>
+      'Brace and a second cannon on the ${zone.name}',
   };
 
   static String _reason(EvolutionStep step) {
@@ -92,6 +96,11 @@ class BriefingScreen extends ConsumerWidget {
     return switch (step.mutation) {
       CannonSplit() when step.zoneShare == 0 => 'You destroyed its cannon.',
       CannonSplit() => 'You destroyed its cannon. $where',
+      WeaponReinforcement() when step.zoneShare == 0 =>
+        'You destroyed its cannon.',
+      WeaponReinforcement() => 'You destroyed its cannon. $where',
+      WeaponUpgrade() when step.zoneShare == 0 => 'Its cannon survived.',
+      WeaponUpgrade() => 'Its cannon survived. $where',
       _ => where,
     };
   }

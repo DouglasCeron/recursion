@@ -31,8 +31,9 @@ After the proof of concept:
 | 13 | Damage shown as part colors and cracks instead of integrity bars | Done |
 | 14 | Observer flees instead of dying and dodges hits; whole-boss critical flash; Next boss button | Done |
 | 15 | Weapon mutations: a destroyed cannon comes back as two | Done |
-| 16 | Enemy laser and missile as evolutions after two cannons | Planned |
-| 17 | Richer observer (ship position, destruction order) | Planned |
+| 16 | Armor materials, and a cannon that gets faster, harder, or duplicated | Done |
+| 17 | Enemy laser and missile after the cannon ladder | Planned |
+| 18 | Richer observer (ship position, destruction order) | Planned |
 
 ## Requirements
 
@@ -242,31 +243,37 @@ the left side can reach boss 5 with only the left side upgraded.
 - **Director** (`EvolutionDirector`, deterministic): every zone that took at
   least **30%** of the damage dealt to boss parts is a candidate. Mutations
   are ranked by that share (armor upgrade first, then extra plate) and
-  applied while valid, up to **3 per generation**. The same boss and report
-  always give the same evolution.
+  applied while valid, up to **3 per generation**. A zone that is already
+  maxed leaves its budget to the next zone that took any damage. The cannon
+  ladder is separate and does not spend that budget. The same boss and
+  report always give the same evolution.
 
 **Mutations** (`lib/features/combat/domain/entities/boss_mutation.dart`):
 
 - **Armor upgrade:** every armor and hull part of the zone gains one armor
-  level, up to level 3. Each level adds half of the part's level-1
-  integrity (armor 100 → 150 → 200, wing 70 → 105 → 140). The core and
-  weapons are never upgraded, so the escape threshold does not change.
+  level, up to level 5. Each level adds a quarter of the part's level-1
+  integrity (armor 100 → 125 → 150 → 175 → 200, wing 70 → 88 → 105 → 123 →
+  140). The level is a material: Iron, Steel, Alloy, Composite, Tempered.
+  The part is born that color; damage still shifts it toward dark red and
+  cracks it. The core and weapons are never upgraded, so the escape
+  threshold does not change.
 - **Extra plate:** one armor plate (80 integrity) just below the zone,
   spanning its parts. It covers every part of the zone that had no cover, so
   it has to break first. One per zone; later armor upgrades raise it too.
-- **Cannon split:** when the observer saw one of this boss's cannons
-  destroyed, the next boss replaces its single cannon with two. They go on
-  the most hit side, or one under each wing when the center was hit most (or
-  when the observer fled before seeing any zone). This reserves one of the 3
-  mutation slots and is applied last, so the new cannons are not covered by
-  a plate added in the same generation. A boss never grows past two cannons,
-  and only one of them drops the Heavy Cannon. They take turns firing the
-  aimed shot, so the rate of fire stays the same; the burst replaces aimed
-  fire only once both are destroyed.
-- Evolved parts get an orange outline in battle and one inner line per
-  armor level above 1. The HUD lists the evolutions the boss carries, and
-  the briefing explains each new mutation with the share of damage that
-  caused it.
+- **Cannon ladder** (one change per generation, on top of the armor budget):
+  a cannon that survived fires faster at level 2 (two thirds of the interval)
+  and hits half again as hard at level 3. Every cannon fires on its own
+  timer, so a second cannon is a second stream of shots. A cannon the
+  observer saw destroyed adds a brace and, until the boss has two, a second
+  level-1 cannon on that same side. The new cannon drops nothing. The burst
+  replaces aimed fire only once every cannon is destroyed. A different
+  weapon after level 3 is not built yet.
+- Older saves can still carry a **cannon split**, which replaced one cannon
+  with two. New generations use the ladder above instead.
+- Evolved parts get an orange outline. Armor above Iron also gets one inner
+  line; the material color carries the level. A fast cannon has a blue bar
+  and a heavy cannon an amber one. The HUD lists what the boss carries, and
+  the briefing explains each new mutation.
 
 Combat still supports mechanics no catalog boss uses yet: per-weapon damage
 multipliers, a shortened core window, and a core shield powered by cannons.
@@ -318,8 +325,9 @@ restart.
   so a battle that ends in victory or escape almost always evolves the
   center. The sides only evolve after battles that spend a lot of fire on a
   wing.
-- A boss stops at two cannons. A different weapon (laser, missile) after
-  that is not built yet.
+- A cannon stops at level 3 and a boss stops at two cannons. The laser and
+  the missile that should follow are not built yet, so a boss whose armor is
+  tempered and whose cannon is already heavy is born unchanged.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.

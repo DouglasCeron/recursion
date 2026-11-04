@@ -26,6 +26,6 @@ void main() {
 
     expect(hudFor(BossCatalog.sentinel).bossName, 'Sentinel');
     expect(hudFor(BossCatalog.sentinel).evolutions, isEmpty);
-    expect(hudFor(evolved).evolutions, ['left armor Lv2', 'left extra plate']);
+    expect(hudFor(evolved).evolutions, ['left Steel', 'left extra plate']);
   });
 }

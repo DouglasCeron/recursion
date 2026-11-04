@@ -35,6 +35,7 @@ void main() {
       [
         isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.center),
         isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.center),
+        isA<WeaponUpgrade>().having((m) => m.faster, 'faster', isTrue),
       ],
       reason: 'every Sentinel shot went to its center',
     );
@@ -43,11 +44,13 @@ void main() {
 
     final boss = session.state.boss;
     expect(boss.definition.name, 'Sentinel Mk II');
-    expect(boss.component('sentinel.armor')!.maxIntegrity, 150);
+    expect(boss.component('sentinel.armor')!.maxIntegrity, 125);
+    expect(boss.definition.component('sentinel.cannon').weaponLevel, 2);
     expect(boss.component(_centerPlate), isNotNull);
     expect(container.read(battleHudProvider(_gen2)).evolutions, [
-      'center armor Lv2',
+      'center Steel',
       'center extra plate',
+      'fast cannon',
     ]);
     final destroyed = [
       for (final e in events.whereType<BossComponentDestroyed>()) e.componentId,
@@ -71,7 +74,8 @@ void main() {
     final third = lineage.definitionOf(lineage.latestId)!;
     expect(third.name, 'Sentinel Mk III');
     expect(third.component('sentinel.armor').armorLevel, 3);
-    expect(third.component('sentinel.armor').maxIntegrity, 200);
+    expect(third.component('sentinel.armor').maxIntegrity, 150);
+    expect(third.component('sentinel.cannon').weaponLevel, 3);
     expect(
       third.components.where((c) => c.id == _centerPlate),
       hasLength(1),
@@ -108,9 +112,11 @@ void main() {
         if (part.kind == BossComponentKind.cannon) part,
     ];
 
-    expect(cannons.map((c) => c.zone), [BossZone.left, BossZone.right]);
+    expect(cannons.map((c) => c.id), contains('sentinel.cannon'));
+    expect(next.component('evolved.cannon_center').zone, BossZone.center);
+    expect(next.component('evolved.cannon_center').dropItemId, isNull);
+    expect(next.component('evolved.brace_center'), isNotNull);
     expect(cannons.where((c) => c.dropItemId != null), hasLength(1));
-    expect(next.components.where((c) => c.id == 'sentinel.cannon'), isEmpty);
   });
 
   test('replaying an older boss does not grow the lineage', () {

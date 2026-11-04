@@ -71,8 +71,9 @@ void main() {
         evolutionSummary(lineageBefore.definitionOf(latestId)!),
       );
       expect(evolutionSummary(restoredBoss), [
-        'center armor Lv2',
+        'center Steel',
         'center extra plate',
+        'fast cannon',
       ]);
     },
   );

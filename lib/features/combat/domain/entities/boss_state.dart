@@ -74,7 +74,7 @@ class BossState {
   double _attackCooldown;
   double _escapeTimeLeft = 0;
   double _shieldBreakTimeLeft = 0;
-  int _nextCannon = 0;
+  final Map<String, double> _cannonReadyIn = {};
   bool _coreWasVulnerable = false;
   BossPhase _phase = BossPhase.engaged;
 
@@ -180,20 +180,40 @@ class BossState {
       }
     }
 
-    _attackCooldown -= dt;
-    if (_attackCooldown > 0) return (events: events, shots: const []);
-    final pattern = attackPattern;
-    final shots = switch (pattern) {
-      BossAttackPattern.aimedCannon => [_aimedShot(targetX, targetY)],
-      BossAttackPattern.radialBurst => _burst(),
-    };
-    final interval = switch (pattern) {
-      BossAttackPattern.aimedCannon => definition.aimedShot.interval,
-      BossAttackPattern.radialBurst => definition.burst.interval,
-    };
-    _attackCooldown = math.max(_attackCooldown + interval, 0);
+    if (attackPattern == BossAttackPattern.radialBurst) {
+      _attackCooldown -= dt;
+      if (_attackCooldown > 0) return (events: events, shots: const []);
+      _attackCooldown = math.max(
+        _attackCooldown + definition.burst.interval,
+        0,
+      );
+      return (events: events, shots: _burst());
+    }
+    final shots = <EnemyShot>[];
+    for (final cannon in _operationalCannons) {
+      final remaining =
+          (_cannonReadyIn[cannon.id] ?? definition.initialAttackDelay) - dt;
+      if (remaining > 0) {
+        _cannonReadyIn[cannon.id] = remaining;
+        continue;
+      }
+      shots.add(_aimedShot(cannon, targetX, targetY));
+      _cannonReadyIn[cannon.id] = math.max(
+        remaining + _cannonInterval(cannon),
+        0,
+      );
+    }
     return (events: events, shots: shots);
   }
+
+  /// Level 2 and above shorten the boss's aimed-shot interval by a third.
+  double _cannonInterval(BossComponentDefinition cannon) =>
+      definition.aimedShot.interval * (cannon.weaponLevel >= 2 ? 2 / 3 : 1);
+
+  /// Level 3 and above add half again to the aimed-shot damage.
+  int _cannonDamage(BossComponentDefinition cannon) => cannon.weaponLevel >= 3
+      ? (definition.aimedShot.damage * 1.5).round()
+      : definition.aimedShot.damage;
 
   /// Applies a hit from a [weaponType] weapon with [baseDamage] to
   /// [componentId].
@@ -298,9 +318,11 @@ class BossState {
     return events;
   }
 
-  EnemyShot _aimedShot(double targetX, double targetY) {
-    final cannons = _operationalCannons;
-    final cannon = cannons[_nextCannon++ % cannons.length];
+  EnemyShot _aimedShot(
+    BossComponentDefinition cannon,
+    double targetX,
+    double targetY,
+  ) {
     final originX = _x + cannon.offsetX;
     final originY = y + cannon.offsetY + cannon.height / 2;
     final dx = targetX - originX;
@@ -315,7 +337,7 @@ class BossState {
       originY: originY,
       velocityX: dirX * pattern.speed,
       velocityY: dirY * pattern.speed,
-      damage: pattern.damage,
+      damage: _cannonDamage(cannon),
     );
   }
 

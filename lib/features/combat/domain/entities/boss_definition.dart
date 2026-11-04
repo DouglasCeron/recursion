@@ -19,7 +19,9 @@ class BossComponentDefinition {
     required this.height,
     this.dropItemId,
     this.coveredBy = const [],
+    this.baseIntegrity,
     this.armorLevel = 1,
+    this.weaponLevel = 1,
     this.evolved = false,
   });
 
@@ -42,9 +44,19 @@ class BossComponentDefinition {
   /// part are absorbed by the first one still standing.
   final List<String> coveredBy;
 
+  /// Integrity the part had at armor level 1. Null means [maxIntegrity] is
+  /// already that base, which is true of every hand-written part.
+  final int? baseIntegrity;
+
+  int get integrityBase => baseIntegrity ?? maxIntegrity;
+
   /// Armor level of an armor or hull part, starting at 1. Each level above 1
-  /// comes from a boss evolution.
+  /// comes from a boss evolution and names a material, up to Tempered.
   final int armorLevel;
+
+  /// Cannon level, starting at 1. Level 2 fires faster and level 3 also hits
+  /// harder. Other parts leave this at 1.
+  final int weaponLevel;
 
   /// Whether a boss evolution added or changed this part.
   final bool evolved;
@@ -63,14 +75,17 @@ class BossComponentDefinition {
   BossComponentDefinition copyWith({
     String? id,
     int? maxIntegrity,
+    int? baseIntegrity,
     List<String>? coveredBy,
     int? armorLevel,
+    int? weaponLevel,
     bool? evolved,
   }) => BossComponentDefinition(
     id: id ?? this.id,
     name: name,
     kind: kind,
     maxIntegrity: maxIntegrity ?? this.maxIntegrity,
+    baseIntegrity: baseIntegrity ?? this.baseIntegrity,
     offsetX: offsetX,
     offsetY: offsetY,
     width: width,
@@ -78,6 +93,7 @@ class BossComponentDefinition {
     dropItemId: dropItemId,
     coveredBy: coveredBy ?? this.coveredBy,
     armorLevel: armorLevel ?? this.armorLevel,
+    weaponLevel: weaponLevel ?? this.weaponLevel,
     evolved: evolved ?? this.evolved,
   );
 }

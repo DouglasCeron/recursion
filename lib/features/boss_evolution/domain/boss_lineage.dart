@@ -1,30 +1,42 @@
 import '../../combat/domain/content/boss_catalog.dart';
+import '../../combat/domain/entities/armor_material.dart';
 import '../../combat/domain/entities/boss_component_state.dart';
 import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/boss_mutation.dart';
 
 /// Short descriptions of every evolution [boss] carries, zone by zone, e.g.
-/// `left armor Lv3` or `left extra plate`.
-List<String> evolutionSummary(BossDefinition boss) => [
-  for (final zone in BossZone.values) ...[
-    if (boss.components
-            .where((c) => c.zone == zone)
-            .map((c) => c.armorLevel)
-            .fold(1, (a, b) => a > b ? a : b)
-        case final level when level > 1)
-      '${zone.name} armor Lv$level',
-    if (boss.components.any((c) => c.id == ExtraPlate(zone).plateId))
-      '${zone.name} extra plate',
-  ],
-  ...switch (boss.components.where((c) => c.kind == BossComponentKind.cannon)) {
-    final cannons when cannons.length >= CannonSplit.maxCannons => [
-      cannons.map((c) => c.zone).toSet().length == 1
-          ? '${cannons.first.zone.name} twin cannons'
-          : 'cannons on both wings',
+/// `left Steel` or `left extra plate`.
+List<String> evolutionSummary(BossDefinition boss) {
+  final cannons = [
+    for (final part in boss.components)
+      if (part.kind == BossComponentKind.cannon) part,
+  ];
+  final weaponLevel = cannons.fold(1, (level, cannon) {
+    return level > cannon.weaponLevel ? level : cannon.weaponLevel;
+  });
+  return [
+    for (final zone in BossZone.values) ...[
+      if (boss.components
+              .where((c) => c.zone == zone)
+              .map((c) => c.armorLevel)
+              .fold(1, (a, b) => a > b ? a : b)
+          case final level when level > 1)
+        '${zone.name} ${ArmorMaterial.at(level).label}',
+      if (boss.components.any((c) => c.id == ExtraPlate(zone).plateId))
+        '${zone.name} extra plate',
+      if (boss.components.any((c) => c.id == WeaponReinforcement(zone).braceId))
+        '${zone.name} weapon brace',
     ],
-    _ => const <String>[],
-  },
-];
+    if (weaponLevel >= 3)
+      'heavy cannon'
+    else if (weaponLevel >= 2)
+      'fast cannon',
+    if (cannons.length >= CannonSplit.maxCannons)
+      cannons.map((c) => c.zone).toSet().length == 1
+          ? 'second ${cannons.first.zone.name} cannon'
+          : 'cannons on both wings',
+  ];
+}
 
 /// One mutation chosen for a generation, with the observed share of damage
 /// in its zone that justified it.

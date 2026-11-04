@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'armor_material.dart';
 import 'boss_component_state.dart';
 import 'boss_definition.dart';
 
@@ -20,12 +21,13 @@ sealed class BossMutation {
 }
 
 /// Raises the armor level of every armor and hull part in [zone] that is not
-/// at [maxLevel] yet. Each level adds half of the part's level-1 integrity.
+/// at [maxLevel] yet. Each level adds a quarter of the part's level-1
+/// integrity, up to tempered steel.
 class ArmorUpgrade extends BossMutation {
   const ArmorUpgrade(super.zone);
 
-  static const maxLevel = 3;
-  static const integrityPerLevel = 0.5;
+  static const maxLevel = ArmorMaterial.maxLevel;
+  static const integrityPerLevel = 0.25;
 
   static bool _isArmored(BossComponentDefinition part) =>
       part.kind == BossComponentKind.armor ||
@@ -47,10 +49,9 @@ class ArmorUpgrade extends BossMutation {
         if (_upgrades(part))
           part.copyWith(
             armorLevel: part.armorLevel + 1,
+            baseIntegrity: part.integrityBase,
             maxIntegrity:
-                (part.maxIntegrity *
-                        _levelMultiplier(part.armorLevel + 1) /
-                        _levelMultiplier(part.armorLevel))
+                (part.integrityBase * _levelMultiplier(part.armorLevel + 1))
                     .round(),
             evolved: true,
           )
@@ -187,5 +188,113 @@ class CannonSplit extends BossMutation {
       (id: 'evolved.cannon_${zone.name}_inner', x: anchor + inward),
       (id: 'evolved.cannon_${zone.name}_outer', x: anchor - inward),
     ];
+  }
+}
+
+/// The cannon survived, so every cannon gains one weapon level. An odd
+/// current level makes the next one fire faster; an even level makes it hit
+/// harder. Stops at [maxLevel]; a different weapon comes after that.
+class WeaponUpgrade extends BossMutation {
+  const WeaponUpgrade(super.zone, {required this.faster});
+
+  /// Level 2 is the faster cannon. Level 3 keeps that rate and hits harder.
+  static const maxLevel = 3;
+
+  final bool faster;
+
+  static bool _canUpgrade(BossComponentDefinition part) =>
+      part.kind == BossComponentKind.cannon && part.weaponLevel < maxLevel;
+
+  @override
+  bool canApply(BossDefinition boss) => boss.components.any(_canUpgrade);
+
+  @override
+  BossDefinition applyTo(BossDefinition boss) => boss.copyWith(
+    components: [
+      for (final part in boss.components)
+        if (_canUpgrade(part))
+          part.copyWith(weaponLevel: part.weaponLevel + 1, evolved: true)
+        else
+          part,
+    ],
+  );
+}
+
+/// The cannon on [zone] was destroyed. Adds a brace there, and a second
+/// cannon (born at weapon level 1) when the boss does not already have two.
+/// The new cannon does not drop an item.
+class WeaponReinforcement extends BossMutation {
+  const WeaponReinforcement(super.zone);
+
+  static const braceIntegrity = 60;
+  static const _gap = 8.0;
+
+  String get braceId => 'evolved.brace_${zone.name}';
+  String get cannonId => 'evolved.cannon_${zone.name}';
+
+  List<BossComponentDefinition> _cannons(BossDefinition boss) => [
+    for (final part in boss.components)
+      if (part.kind == BossComponentKind.cannon) part,
+  ];
+
+  BossComponentDefinition? _host(BossDefinition boss) {
+    for (final cannon in _cannons(boss)) {
+      if (cannon.zone == zone) return cannon;
+    }
+    final cannons = _cannons(boss);
+    return cannons.isEmpty ? null : cannons.first;
+  }
+
+  @override
+  bool canApply(BossDefinition boss) {
+    if (_host(boss) == null) return false;
+    final needsBrace = boss.components.every((c) => c.id != braceId);
+    final needsCannon =
+        _cannons(boss).length < CannonSplit.maxCannons &&
+        boss.components.every((c) => c.id != cannonId);
+    return needsBrace || needsCannon;
+  }
+
+  @override
+  BossDefinition applyTo(BossDefinition boss) {
+    if (!canApply(boss)) return boss;
+    final host = _host(boss)!;
+    final parts = [...boss.components];
+    if (_cannons(boss).length < CannonSplit.maxCannons &&
+        boss.components.every((c) => c.id != cannonId)) {
+      final below = zone == BossZone.center;
+      parts.add(
+        BossComponentDefinition(
+          id: cannonId,
+          name: 'Cannon',
+          kind: BossComponentKind.cannon,
+          maxIntegrity: host.maxIntegrity,
+          offsetX: below
+              ? host.offsetX
+              : host.offsetX +
+                    (zone == BossZone.left ? -1 : 1) * (host.width + _gap),
+          offsetY: below ? host.bottom + _gap + host.height / 2 : host.offsetY,
+          width: host.width,
+          height: host.height,
+          evolved: true,
+        ),
+      );
+    }
+    if (boss.components.every((c) => c.id != braceId)) {
+      parts.add(
+        BossComponentDefinition(
+          id: braceId,
+          name: 'Brace',
+          kind: BossComponentKind.armor,
+          maxIntegrity: braceIntegrity,
+          offsetX: host.offsetX + host.width / 2 + _gap,
+          offsetY: host.offsetY,
+          width: 12,
+          height: host.height,
+          evolved: true,
+        ),
+      );
+    }
+    return boss.copyWith(components: parts);
   }
 }

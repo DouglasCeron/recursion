@@ -10,16 +10,16 @@ void main() {
   const sentinel = BossCatalog.sentinel;
 
   group('ArmorUpgrade', () {
-    test('raises armor and hull parts of its zone by half their base '
+    test('raises armor and hull parts of its zone by a quarter of their base '
         'integrity per level', () {
       final once = const ArmorUpgrade(BossZone.left).applyTo(sentinel);
       final twice = const ArmorUpgrade(BossZone.left).applyTo(once);
 
       expect(once.component('sentinel.hull_left').armorLevel, 2);
-      expect(once.component('sentinel.hull_left').maxIntegrity, 105);
+      expect(once.component('sentinel.hull_left').maxIntegrity, 88);
       expect(once.component('sentinel.hull_left').evolved, isTrue);
       expect(twice.component('sentinel.hull_left').armorLevel, 3);
-      expect(twice.component('sentinel.hull_left').maxIntegrity, 140);
+      expect(twice.component('sentinel.hull_left').maxIntegrity, 105);
       expect(twice.component('sentinel.hull_right').armorLevel, 1);
     });
 
@@ -27,7 +27,7 @@ void main() {
       final boss = const ArmorUpgrade(BossZone.center).applyTo(sentinel);
 
       expect(boss.component('sentinel.armor').armorLevel, 2);
-      expect(boss.component('sentinel.armor').maxIntegrity, 150);
+      expect(boss.component('sentinel.armor').maxIntegrity, 125);
       expect(boss.component('sentinel.core').armorLevel, 1);
       expect(boss.component('sentinel.core').maxIntegrity, 400);
       expect(boss.component('sentinel.cannon').armorLevel, 1);
@@ -125,20 +125,61 @@ void main() {
       expect(split.applyTo(boss).components, boss.components);
     });
 
-    test('the two cannons take turns firing, at the original rate', () {
+    test('both cannons fire on each volley', () {
       final boss = BossState(
         definition: const CannonSplit(BossZone.center).applyTo(sentinel),
         arena: ArenaBounds.standard,
       );
-      final origins = <double>[];
+      final volleys = <Set<double>>[];
       for (final step in [1.5, 1.2, 1.2, 1.2]) {
         final update = boss.update(step, targetX: 180, targetY: 500);
-        origins.addAll(update.shots.map((shot) => shot.originX - boss.x));
+        volleys.add({for (final shot in update.shots) shot.originX - boss.x});
       }
 
-      expect(origins, hasLength(4));
-      expect(origins.toSet(), {-76, 76});
-      expect(origins[0], isNot(origins[1]));
+      expect(volleys, everyElement({-76, 76}));
+    });
+
+    group('weapon ladder', () {
+      test('a surviving cannon gets faster, then hits harder, then stops', () {
+        const faster = WeaponUpgrade(BossZone.center, faster: true);
+        const harder = WeaponUpgrade(BossZone.center, faster: false);
+        final quick = faster.applyTo(sentinel);
+        final heavy = harder.applyTo(quick);
+
+        expect(quick.component('sentinel.cannon').weaponLevel, 2);
+        expect(heavy.component('sentinel.cannon').weaponLevel, 3);
+        expect(harder.canApply(heavy), isFalse);
+      });
+
+      test(
+        'a destroyed center cannon adds a brace and a second cannon there',
+        () {
+          final boss = const WeaponReinforcement(
+            BossZone.center,
+          ).applyTo(sentinel);
+          final cannons = [
+            for (final part in boss.components)
+              if (part.kind == BossComponentKind.cannon) part,
+          ];
+          final added = boss.component('evolved.cannon_center');
+          final brace = boss.component('evolved.brace_center');
+
+          expect(cannons, hasLength(2));
+          expect(added.zone, BossZone.center);
+          expect(added.weaponLevel, 1);
+          expect(added.dropItemId, isNull);
+          expect(
+            added.top,
+            greaterThan(sentinel.component('sentinel.cannon').bottom),
+          );
+          expect(brace.kind, BossComponentKind.armor);
+          expect(brace.maxIntegrity, WeaponReinforcement.braceIntegrity);
+          expect(
+            const WeaponReinforcement(BossZone.center).canApply(boss),
+            isFalse,
+          );
+        },
+      );
     });
   });
 }

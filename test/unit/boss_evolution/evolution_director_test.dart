@@ -49,6 +49,7 @@ void main() {
       (ArmorUpgrade, BossZone.left),
       (ExtraPlate, BossZone.left),
       (ArmorUpgrade, BossZone.right),
+      (WeaponUpgrade, BossZone.left),
     ]);
     expect(generation.steps.first.zoneShare, 0.5);
     expect(generation.basedOnReport, 1);
@@ -64,7 +65,11 @@ void main() {
       }),
     );
 
-    expect(generation.steps, hasLength(EvolutionDirector.budget));
+    expect(
+      generation.steps.where((s) => s.mutation is! WeaponUpgrade),
+      hasLength(EvolutionDirector.budget),
+    );
+    expect(generation.steps.last.mutation, isA<WeaponUpgrade>());
   });
 
   test('keeps upgrading the same zone, plate included, until it is maxed '
@@ -81,59 +86,68 @@ void main() {
     }
 
     expect(perGeneration, [
-      [(ArmorUpgrade, BossZone.left), (ExtraPlate, BossZone.left)],
+      [
+        (ArmorUpgrade, BossZone.left),
+        (ExtraPlate, BossZone.left),
+        (WeaponUpgrade, BossZone.left),
+      ],
+      [(ArmorUpgrade, BossZone.left), (WeaponUpgrade, BossZone.left)],
       [(ArmorUpgrade, BossZone.left)],
       [(ArmorUpgrade, BossZone.left)],
-      isEmpty,
     ]);
-    expect(boss.component('sentinel.hull_left').armorLevel, 3);
-    expect(boss.component('evolved.plate_left').armorLevel, 3);
-    expect(boss.component('evolved.plate_left').maxIntegrity, 160);
+    expect(boss.component('sentinel.cannon').weaponLevel, 3);
+    expect(boss.component('sentinel.hull_left').armorLevel, 5);
+    expect(boss.component('evolved.plate_left').armorLevel, 4);
+    expect(boss.component('evolved.plate_left').maxIntegrity, 140);
   });
 
-  test('a destroyed cannon takes one budget slot and goes to the most hit '
-      'side', () {
+  test('a destroyed cannon adds a brace and a second cannon on its side, '
+      'without spending the armor budget', () {
     final generation = EvolutionDirector.next(
       sentinel,
-      reportOf(
-        {BossZone.left: 0.8, BossZone.center: 0.2},
-        destroyedWeaponIds: ['sentinel.cannon'],
-      ),
+      reportOf({BossZone.center: 1}, destroyedWeaponIds: ['sentinel.cannon']),
     );
 
     expect(mutationsOf(generation.steps.map((s) => s.mutation)), [
-      (ArmorUpgrade, BossZone.left),
-      (ExtraPlate, BossZone.left),
-      (CannonSplit, BossZone.left),
+      (ArmorUpgrade, BossZone.center),
+      (ExtraPlate, BossZone.center),
+      (WeaponReinforcement, BossZone.center),
     ]);
     final boss = generation.steps.fold(
       sentinel,
       (b, s) => s.mutation.applyTo(b),
     );
     expect(
-      boss.components
-          .where((c) => c.kind == BossComponentKind.cannon)
-          .map((c) => c.zone),
-      [BossZone.left, BossZone.left],
+      boss.components.where((c) => c.kind == BossComponentKind.cannon),
+      hasLength(2),
     );
+    expect(boss.component('evolved.brace_center'), isNotNull);
   });
 
-  test('when the center was hit most, the cannons spread over the wings', () {
+  test('a maxed zone spills the remaining budget onto the next zone', () {
+    var boss = sentinel;
+    final focused = reportOf({BossZone.left: 1});
+    for (var i = 0; i < 6; i++) {
+      for (final step in EvolutionDirector.next(boss, focused).steps) {
+        boss = step.mutation.applyTo(boss);
+      }
+    }
+
     final generation = EvolutionDirector.next(
-      sentinel,
-      reportOf(
-        {BossZone.center: 0.6, BossZone.left: 0.4},
-        destroyedWeaponIds: ['sentinel.cannon'],
-      ),
+      boss,
+      reportOf({BossZone.left: 0.9, BossZone.right: 0.1}),
     );
 
     expect(
-      generation.steps.last.mutation,
-      isA<CannonSplit>().having((m) => m.zone, 'zone', BossZone.center),
+      generation.steps.map((s) => s.mutation),
+      containsAll([
+        isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.right),
+        isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.right),
+      ]),
     );
   });
 
-  test('a cannon destroyed on another boss does not split this one', () {
+  test('a cannon destroyed on another boss does not reinforce this one', () {
     final generation = EvolutionDirector.next(
       sentinel,
       reportOf({BossZone.left: 1}, destroyedWeaponIds: ['evolved.cannon_left']),
@@ -141,7 +155,7 @@ void main() {
 
     expect(
       generation.steps.map((s) => s.mutation),
-      isNot(contains(isA<CannonSplit>())),
+      isNot(contains(isA<WeaponReinforcement>())),
     );
   });
 
@@ -159,6 +173,7 @@ void main() {
       (ArmorUpgrade, BossZone.left),
       (ArmorUpgrade, BossZone.right),
       (ExtraPlate, BossZone.left),
+      (WeaponUpgrade, BossZone.left),
     ]);
   });
 }

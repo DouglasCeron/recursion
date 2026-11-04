@@ -149,14 +149,16 @@ void main() {
     });
   });
 
-  test('cannons fire in turns from both sides', () {
+  test('both cannons fire from their own side', () {
     final boss = newWarden();
 
-    final first = tick(boss, warden.initialAttackDelay).shots.single;
-    final second = tick(boss, warden.aimedShot.interval).shots.single;
+    final shots = tick(boss, warden.initialAttackDelay).shots;
 
-    expect(first.originX, lessThan(boss.x));
-    expect(second.originX, greaterThan(boss.x));
+    expect(shots, hasLength(2));
+    expect(
+      shots.map((shot) => shot.originX > boss.x),
+      containsAll([true, false]),
+    );
   });
 
   group('modifiers', () {

@@ -345,6 +345,10 @@ void main() {
       expect(generation.steps.map((s) => s.mutation), [
         isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.center),
         isA<ExtraPlate>().having((m) => m.zone, 'zone', BossZone.center),
+        isA<ArmorUpgrade>().having((m) => m.zone, 'zone', BossZone.left),
+        isA<WeaponUpgrade>()
+            .having((m) => m.zone, 'zone', BossZone.center)
+            .having((m) => m.faster, 'faster', isTrue),
       ]);
     });
 

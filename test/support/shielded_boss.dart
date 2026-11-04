@@ -4,8 +4,8 @@ import 'package:recursion/features/combat/domain/rules/escape_rule.dart';
 import 'package:recursion/features/combat/domain/rules/vulnerability_window.dart';
 
 /// A boss that is not in the campaign, used to test combat mechanics no
-/// catalog boss uses yet: a core shield powered by two cannons that fire in
-/// turns, each cannon behind a housing and the core behind a front plate.
+/// catalog boss uses yet: a core shield powered by two cannons that each
+/// fire, each cannon behind a housing and the core behind a front plate.
 const shieldedBoss = BossDefinition(
   id: 'test.warden',
   name: 'Warden',

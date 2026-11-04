@@ -57,9 +57,9 @@ void main() {
     final third = lineage.definitionOf('boss.sentinel.gen3')!;
 
     expect(second.component('sentinel.hull_left').armorLevel, 2);
-    expect(evolutionSummary(second), ['left armor Lv2']);
+    expect(evolutionSummary(second), ['left Steel']);
     expect(third.component('sentinel.hull_left').armorLevel, 3);
-    expect(evolutionSummary(third), ['left armor Lv3', 'left extra plate']);
+    expect(evolutionSummary(third), ['left Alloy', 'left extra plate']);
     expect(evolutionSummary(lineage.definitionOf('boss.sentinel')!), isEmpty);
   });
 }

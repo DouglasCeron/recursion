@@ -10,10 +10,10 @@ import 'boss_lineage.dart';
 /// Every zone that took at least [zoneFocusThreshold] of the observed damage
 /// is a candidate; mutations are ranked by that share (armor upgrades before
 /// extra plates) and applied while they are valid, up to [budget] per
-/// generation. Destroying a cannon reserves one of those slots for a second
-/// cannon, placed on the most hit side (or spread over the wings when the
-/// center was hit most). Upgrades accumulate, so a player who keeps hitting
-/// one side keeps making that side stronger until it is maxed out.
+/// generation. Zones under the threshold get the budget that a maxed zone
+/// could not spend. The cannon ladder is separate: a cannon that survived
+/// fires faster, then hits harder, and a cannon the observer saw destroyed
+/// comes back with a brace and a second cannon on that side.
 abstract final class EvolutionDirector {
   static const budget = 3;
   static const zoneFocusThreshold = 0.3;
@@ -24,10 +24,38 @@ abstract final class EvolutionDirector {
 
   static BossGeneration next(BossDefinition current, IntelReport? report) {
     if (report == null) return const BossGeneration();
+    final steps = <EvolutionStep>[];
+    var boss = current;
+    for (final spill in [false, true]) {
+      if (steps.length == budget) break;
+      for (final candidate in _ranked(report, spill: spill)) {
+        if (steps.length == budget) break;
+        final mutation = candidate.mutation;
+        if (!mutation.canApply(boss)) continue;
+        boss = mutation.applyTo(boss);
+        steps.add(candidate);
+      }
+    }
+    final weapon = _weaponStep(boss, report);
+    if (weapon != null) {
+      steps.add(weapon);
+    }
+    return BossGeneration(
+      steps: List.unmodifiable(steps),
+      basedOnReport: report.sequence,
+    );
+  }
+
+  static List<EvolutionStep> _ranked(
+    IntelReport report, {
+    required bool spill,
+  }) {
     final candidates = <({double score, EvolutionStep step})>[];
     for (final zone in BossZone.values) {
       final share = report.profile.zoneShares[zone];
-      if (share == null || share < zoneFocusThreshold) continue;
+      if (share == null || share <= 0) continue;
+      final focused = share >= zoneFocusThreshold;
+      if (focused == spill) continue;
       for (final (mutation, weight) in [
         (ArmorUpgrade(zone), _armorWeight),
         (ExtraPlate(zone), _plateWeight),
@@ -46,50 +74,49 @@ abstract final class EvolutionDirector {
           final byScore = b.$2.score.compareTo(a.$2.score);
           return byScore != 0 ? byScore : a.$1.compareTo(b.$1);
         });
-
-    final cannon = _cannonStep(current, report);
-    var boss = current;
-    final steps = <EvolutionStep>[];
-    final room = budget - (cannon == null ? 0 : 1);
-    for (final (_, candidate) in ranked) {
-      if (steps.length == room) break;
-      final mutation = candidate.step.mutation;
-      if (!mutation.canApply(boss)) continue;
-      boss = mutation.applyTo(boss);
-      steps.add(candidate.step);
-    }
-    // Last, so an extra plate added above does not end up covering it.
-    if (cannon != null && cannon.mutation.canApply(boss)) {
-      steps.add(cannon);
-    }
-    return BossGeneration(
-      steps: List.unmodifiable(steps),
-      basedOnReport: report.sequence,
-    );
+    return [for (final (_, candidate) in ranked) candidate.step];
   }
 
-  /// A second cannon where the player hit most, when the observer saw a
-  /// cannon of [current] destroyed. No zone data spreads them over the wings.
-  static EvolutionStep? _cannonStep(
+  /// One weapon change, on top of the armor budget. A destroyed cannon of
+  /// [current] grows a brace and a second cannon on its side. Otherwise every
+  /// cannon below the cap gains a level.
+  static EvolutionStep? _weaponStep(
     BossDefinition current,
     IntelReport report,
   ) {
-    final cannons = {
+    final cannons = [
       for (final part in current.components)
-        if (part.kind == BossComponentKind.cannon) part.id,
-    };
-    final sawOneFall = report.profile.destroyedWeaponIds.any(cannons.contains);
-    if (!sawOneFall) return null;
-    final split = CannonSplit(_mostHit(report));
-    if (!split.canApply(current)) return null;
+        if (part.kind == BossComponentKind.cannon) part,
+    ];
+    BossComponentDefinition? fallen;
+    for (final id in report.profile.destroyedWeaponIds) {
+      for (final cannon in cannons) {
+        if (cannon.id == id) fallen = cannon;
+      }
+    }
+    if (fallen != null) {
+      final reinforcement = WeaponReinforcement(fallen.zone);
+      if (!reinforcement.canApply(current)) return null;
+      return EvolutionStep(
+        mutation: reinforcement,
+        zoneShare: report.profile.zoneShares[fallen.zone] ?? 0,
+      );
+    }
+    // No zone damage and no fallen cannon means the observer never saw the
+    // boss, so the cannon does not evolve.
+    if (cannons.isEmpty || report.profile.zoneShares.isEmpty) return null;
+    final lowest = cannons
+        .map((c) => c.weaponLevel)
+        .reduce((a, b) => a < b ? a : b);
+    if (lowest >= WeaponUpgrade.maxLevel) return null;
+    final zone = _mostHit(report);
     return EvolutionStep(
-      mutation: split,
-      zoneShare: report.profile.zoneShares[split.zone] ?? 0,
+      mutation: WeaponUpgrade(zone, faster: lowest.isOdd),
+      zoneShare: report.profile.zoneShares[zone] ?? 0,
     );
   }
 
-  /// Zone with the largest share; a tie goes to the center, which spreads
-  /// the cannons instead of stacking them.
+  /// Zone with the largest share. A tie goes to the center.
   static BossZone _mostHit(IntelReport report) {
     final shares = report.profile.zoneShares;
     if (shares.isEmpty) return BossZone.center;

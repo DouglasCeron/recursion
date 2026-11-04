@@ -9,6 +9,7 @@ import 'package:flutter/animation.dart';
 import '../../domain/entities/boss_component_state.dart';
 import '../../domain/entities/boss_definition.dart';
 import '../../domain/entities/boss_state.dart';
+import 'armor_material_colors.dart';
 import 'damage_palette.dart';
 
 /// Visual container for a boss; mirrors [BossState] position and phase.
@@ -142,6 +143,8 @@ class BossPartComponent extends PositionComponent {
     ..color = const Color(0xCCFFE0B2)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1;
+  static final _fastPaint = Paint()..color = const Color(0xFF7FD4FF);
+  static final _heavyPaint = Paint()..color = const Color(0xFFFFB74D);
 
   @override
   Future<void> onLoad() async {
@@ -192,14 +195,23 @@ class BossPartComponent extends PositionComponent {
       case BossComponentKind.armor:
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-          _fill(_armorColor),
+          _fill(ArmorMaterialColors.of(definition.armorLevel, _armorColor)),
         );
       case BossComponentKind.hull:
         final hull = RRect.fromRectAndRadius(rect, const Radius.circular(2));
-        canvas.drawRRect(hull, _fill(_hullColor));
+        canvas.drawRRect(
+          hull,
+          _fill(ArmorMaterialColors.of(definition.armorLevel, _hullColor)),
+        );
         canvas.drawRRect(hull.deflate(3), _hullSeamPaint);
       case BossComponentKind.cannon:
         canvas.drawRect(rect, _fill(_cannonColor));
+        if (definition.weaponLevel >= 2) {
+          canvas.drawRect(
+            Rect.fromLTWH(rect.left, rect.bottom - 4, rect.width, 3),
+            definition.weaponLevel >= 3 ? _heavyPaint : _fastPaint,
+          );
+        }
     }
     _renderCracks(canvas, rect);
     if (boss.isCovered(definition.id)) {
@@ -212,9 +224,10 @@ class BossPartComponent extends PositionComponent {
             )
           : canvas.drawRect(shade, _coveredShadePaint);
     }
-    // One inner line per armor level above 1.
-    for (var level = 2; level <= definition.armorLevel; level++) {
-      final inner = rect.deflate(2 * (level - 1));
+    if (definition.armorLevel > 1 &&
+        (definition.kind == BossComponentKind.armor ||
+            definition.kind == BossComponentKind.hull)) {
+      final inner = rect.deflate(3);
       if (inner.width > 0 && inner.height > 0) {
         canvas.drawRect(inner, _armorLevelPaint);
       }

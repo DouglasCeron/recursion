@@ -259,9 +259,12 @@ class SaveGameCodec {
             ArmorUpgrade() => 'armorUpgrade',
             ExtraPlate() => 'extraPlate',
             CannonSplit() => 'cannonSplit',
+            WeaponUpgrade() => 'weaponUpgrade',
+            WeaponReinforcement() => 'weaponReinforcement',
           },
           'zone': step.mutation.zone.name,
           'zoneShare': step.zoneShare,
+          if (step.mutation case WeaponUpgrade(:final faster)) 'faster': faster,
         },
     ],
   };
@@ -381,6 +384,8 @@ class SaveGameCodec {
       'armorUpgrade' => ArmorUpgrade(zone),
       'extraPlate' => ExtraPlate(zone),
       'cannonSplit' => CannonSplit(zone),
+      'weaponUpgrade' => WeaponUpgrade(zone, faster: json['faster'] == true),
+      'weaponReinforcement' => WeaponReinforcement(zone),
       _ => null,
     };
     if (mutation == null) return null;
