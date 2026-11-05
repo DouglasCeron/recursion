@@ -3,7 +3,11 @@ import '../rules/damage_rules.dart';
 /// Kinds of boss parts. Each kind carries different rules: losing the cannon
 /// changes the attack pattern and destroying the core defeats the boss.
 /// Armor and hull only protect; hull is the outer plating, never drops.
-enum BossComponentKind { cannon, armor, hull, core }
+enum BossComponentKind { cannon, armor, hull, core, laser, missile }
+
+/// A boss weapon that is not a cannon. Added by evolution once the cannons
+/// are already at full power.
+enum BossWeapon { laser, missile }
 
 /// Result of applying damage to a [BossComponentState].
 class DamageOutcome {

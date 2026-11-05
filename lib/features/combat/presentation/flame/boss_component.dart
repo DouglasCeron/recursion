@@ -94,7 +94,9 @@ class BossPartComponent extends PositionComponent {
          // Outer layers are drawn over the parts they cover.
          priority: switch (definition.kind) {
            BossComponentKind.core => 0,
-           BossComponentKind.cannon => 1,
+           BossComponentKind.cannon ||
+           BossComponentKind.laser ||
+           BossComponentKind.missile => 1,
            BossComponentKind.armor => 2,
            BossComponentKind.hull => 3,
          },
@@ -204,6 +206,21 @@ class BossPartComponent extends PositionComponent {
           _fill(ArmorMaterialColors.of(definition.armorLevel, _hullColor)),
         );
         canvas.drawRRect(hull.deflate(3), _hullSeamPaint);
+      case BossComponentKind.laser:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+          _fill(const Color(0xFF4DF0FF)),
+        );
+      case BossComponentKind.missile:
+        canvas.drawPath(
+          Path()
+            ..moveTo(rect.center.dx, rect.top)
+            ..lineTo(rect.right, rect.center.dy)
+            ..lineTo(rect.center.dx, rect.bottom)
+            ..lineTo(rect.left, rect.center.dy)
+            ..close(),
+          _fill(const Color(0xFFFFC857)),
+        );
       case BossComponentKind.cannon:
         canvas.drawRect(rect, _fill(_cannonColor));
         if (definition.weaponLevel >= 2) {

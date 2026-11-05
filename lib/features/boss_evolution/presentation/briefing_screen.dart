@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../combat/domain/entities/boss_component_state.dart';
 import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/boss_mutation.dart';
 import '../application/boss_lineage_controller.dart';
@@ -87,6 +88,10 @@ class BriefingScreen extends ConsumerWidget {
       faster ? 'Cannon fires faster' : 'Cannon hits harder',
     WeaponReinforcement(:final zone) =>
       'Brace and a second cannon on the ${zone.name}',
+    AddedWeapon(:final weapon, :final zone) => switch (weapon) {
+      BossWeapon.laser => 'Laser on the ${zone.name}',
+      BossWeapon.missile => 'Missile on the ${zone.name}',
+    },
   };
 
   static String _reason(EvolutionStep step) {
@@ -101,6 +106,7 @@ class BriefingScreen extends ConsumerWidget {
       WeaponReinforcement() => 'You destroyed its cannon. $where',
       WeaponUpgrade() when step.zoneShare == 0 => 'Its cannon survived.',
       WeaponUpgrade() => 'Its cannon survived. $where',
+      AddedWeapon() => 'Its cannon is already at full power. $where',
       _ => where,
     };
   }

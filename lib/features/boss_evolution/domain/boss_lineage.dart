@@ -35,6 +35,10 @@ List<String> evolutionSummary(BossDefinition boss) {
       cannons.map((c) => c.zone).toSet().length == 1
           ? 'second ${cannons.first.zone.name} cannon'
           : 'cannons on both wings',
+    for (final part in boss.components)
+      if (part.kind == BossComponentKind.laser) '${part.zone.name} laser',
+    for (final part in boss.components)
+      if (part.kind == BossComponentKind.missile) '${part.zone.name} missile',
   ];
 }
 

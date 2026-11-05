@@ -32,7 +32,7 @@ After the proof of concept:
 | 14 | Observer flees instead of dying and dodges hits; whole-boss critical flash; Next boss button | Done |
 | 15 | Weapon mutations: a destroyed cannon comes back as two | Done |
 | 16 | Armor materials, and a cannon that gets faster, harder, or duplicated | Done |
-| 17 | Enemy laser and missile after the cannon ladder | Planned |
+| 17 | Laser, then missile, once the cannon is at full power | Done |
 | 18 | Richer observer (ship position, destruction order) | Planned |
 
 ## Requirements
@@ -265,9 +265,11 @@ the left side can reach boss 5 with only the left side upgraded.
   and hits half again as hard at level 3. Every cannon fires on its own
   timer, so a second cannon is a second stream of shots. A cannon the
   observer saw destroyed adds a brace and, until the boss has two, a second
-  level-1 cannon on that same side. The new cannon drops nothing. The burst
-  replaces aimed fire only once every cannon is destroyed. A different
-  weapon after level 3 is not built yet.
+  level-1 cannon on that same side. The new cannon drops nothing. Once every
+  cannon is at level 3, the next generation adds one **laser** (fast, light,
+  cyan) on the most hit side, and the generation after that one **missile**
+  (slow, heavy, amber). Each fires on its own timer. The burst replaces
+  aimed fire only once every cannon, laser and missile is destroyed.
 - Older saves can still carry a **cannon split**, which replaced one cannon
   with two. New generations use the ladder above instead.
 - Evolved parts get an orange outline. Armor above Iron also gets one inner
@@ -325,9 +327,8 @@ restart.
   so a battle that ends in victory or escape almost always evolves the
   center. The sides only evolve after battles that spend a lot of fire on a
   wing.
-- A cannon stops at level 3 and a boss stops at two cannons. The laser and
-  the missile that should follow are not built yet, so a boss whose armor is
-  tempered and whose cannon is already heavy is born unchanged.
+- A boss gets one laser and one missile. After both, and once its armor is
+  tempered, a generation can be born unchanged.
 - Only one save slot.
 - Flame rendering is verified manually; automated tests cover the rules, the
   battle flow, the providers and the menu and map screens, not what is drawn.

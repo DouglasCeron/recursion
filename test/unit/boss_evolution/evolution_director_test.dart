@@ -92,10 +92,14 @@ void main() {
         (WeaponUpgrade, BossZone.left),
       ],
       [(ArmorUpgrade, BossZone.left), (WeaponUpgrade, BossZone.left)],
-      [(ArmorUpgrade, BossZone.left)],
-      [(ArmorUpgrade, BossZone.left)],
+      [(ArmorUpgrade, BossZone.left), (AddedWeapon, BossZone.left)],
+      [(ArmorUpgrade, BossZone.left), (AddedWeapon, BossZone.left)],
     ]);
     expect(boss.component('sentinel.cannon').weaponLevel, 3);
+    expect(
+      boss.components.map((c) => c.kind),
+      containsAll([BossComponentKind.laser, BossComponentKind.missile]),
+    );
     expect(boss.component('sentinel.hull_left').armorLevel, 5);
     expect(boss.component('evolved.plate_left').armorLevel, 4);
     expect(boss.component('evolved.plate_left').maxIntegrity, 140);

@@ -99,6 +99,7 @@ class SpaceGame extends FlameGame with HasCollisionDetection {
             projectileId: event.projectileId,
             origin: Vector2(event.originX, event.originY),
             velocity: Vector2(event.velocityX, event.velocityY),
+            style: event.style,
           ),
         );
       case BossComponentDestroyed():

@@ -116,6 +116,7 @@ class BattleState {
           originY: shot.originY,
           velocityX: shot.velocityX,
           velocityY: shot.velocityY,
+          style: shot.style,
         ),
       );
     }
@@ -174,7 +175,9 @@ class BattleState {
     );
     for (final destroyed
         in events.whereType<BossComponentDestroyed>().toList()) {
-      if (destroyed.kind == BossComponentKind.cannon) {
+      if (destroyed.kind == BossComponentKind.cannon ||
+          destroyed.kind == BossComponentKind.laser ||
+          destroyed.kind == BossComponentKind.missile) {
         _log.recordDestroyedWeapon(destroyed.componentId);
         observer.observeDestroyedWeapon(destroyed.componentId);
       }

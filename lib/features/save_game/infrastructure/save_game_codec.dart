@@ -6,6 +6,7 @@ import '../../boss_evolution/domain/evolution_director.dart';
 import '../../boss_evolution/domain/weapon_exposure_profile.dart';
 import '../../combat/domain/content/boss_catalog.dart';
 import '../../combat/domain/entities/battle_record.dart';
+import '../../combat/domain/entities/boss_component_state.dart';
 import '../../combat/domain/entities/boss_definition.dart';
 import '../../combat/domain/entities/boss_mutation.dart';
 import '../../combat/domain/entities/combat_log.dart';
@@ -261,10 +262,13 @@ class SaveGameCodec {
             CannonSplit() => 'cannonSplit',
             WeaponUpgrade() => 'weaponUpgrade',
             WeaponReinforcement() => 'weaponReinforcement',
+            AddedWeapon() => 'addedWeapon',
           },
           'zone': step.mutation.zone.name,
           'zoneShare': step.zoneShare,
           if (step.mutation case WeaponUpgrade(:final faster)) 'faster': faster,
+          if (step.mutation case AddedWeapon(:final weapon))
+            'weapon': weapon.name,
         },
     ],
   };
@@ -386,6 +390,10 @@ class SaveGameCodec {
       'cannonSplit' => CannonSplit(zone),
       'weaponUpgrade' => WeaponUpgrade(zone, faster: json['faster'] == true),
       'weaponReinforcement' => WeaponReinforcement(zone),
+      'addedWeapon' => switch (BossWeapon.values.asNameMap()[json['weapon']]) {
+        final weapon? => AddedWeapon(zone, weapon),
+        null => null,
+      },
       _ => null,
     };
     if (mutation == null) return null;

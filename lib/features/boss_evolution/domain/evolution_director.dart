@@ -13,7 +13,9 @@ import 'boss_lineage.dart';
 /// generation. Zones under the threshold get the budget that a maxed zone
 /// could not spend. The cannon ladder is separate: a cannon that survived
 /// fires faster, then hits harder, and a cannon the observer saw destroyed
-/// comes back with a brace and a second cannon on that side.
+/// comes back with a brace and a second cannon on that side. Once every
+/// cannon is at full power, the next generation adds a laser and the one
+/// after that a missile.
 abstract final class EvolutionDirector {
   static const budget = 3;
   static const zoneFocusThreshold = 0.3;
@@ -79,7 +81,8 @@ abstract final class EvolutionDirector {
 
   /// One weapon change, on top of the armor budget. A destroyed cannon of
   /// [current] grows a brace and a second cannon on its side. Otherwise every
-  /// cannon below the cap gains a level.
+  /// cannon below the cap gains a level, and a cannon already at full power
+  /// is followed by a laser and then a missile.
   static EvolutionStep? _weaponStep(
     BossDefinition current,
     IntelReport report,
@@ -96,24 +99,36 @@ abstract final class EvolutionDirector {
     }
     if (fallen != null) {
       final reinforcement = WeaponReinforcement(fallen.zone);
-      if (!reinforcement.canApply(current)) return null;
-      return EvolutionStep(
-        mutation: reinforcement,
-        zoneShare: report.profile.zoneShares[fallen.zone] ?? 0,
-      );
+      if (reinforcement.canApply(current)) {
+        return EvolutionStep(
+          mutation: reinforcement,
+          zoneShare: report.profile.zoneShares[fallen.zone] ?? 0,
+        );
+      }
     }
     // No zone damage and no fallen cannon means the observer never saw the
-    // boss, so the cannon does not evolve.
-    if (cannons.isEmpty || report.profile.zoneShares.isEmpty) return null;
-    final lowest = cannons
-        .map((c) => c.weaponLevel)
-        .reduce((a, b) => a < b ? a : b);
-    if (lowest >= WeaponUpgrade.maxLevel) return null;
+    // boss, so its weapons do not evolve.
+    if (report.profile.zoneShares.isEmpty) return null;
     final zone = _mostHit(report);
-    return EvolutionStep(
-      mutation: WeaponUpgrade(zone, faster: lowest.isOdd),
-      zoneShare: report.profile.zoneShares[zone] ?? 0,
-    );
+    final share = report.profile.zoneShares[zone] ?? 0;
+    if (cannons.isNotEmpty) {
+      final lowest = cannons
+          .map((c) => c.weaponLevel)
+          .reduce((a, b) => a < b ? a : b);
+      if (lowest < WeaponUpgrade.maxLevel) {
+        return EvolutionStep(
+          mutation: WeaponUpgrade(zone, faster: lowest.isOdd),
+          zoneShare: share,
+        );
+      }
+    }
+    for (final weapon in BossWeapon.values) {
+      final added = AddedWeapon(zone, weapon);
+      if (added.canApply(current)) {
+        return EvolutionStep(mutation: added, zoneShare: share);
+      }
+    }
+    return null;
   }
 
   /// Zone with the largest share. A tie goes to the center.

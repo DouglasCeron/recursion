@@ -13,6 +13,9 @@ enum BossPhase { engaged, escaping, escaped, defeated }
 
 enum BossAttackPattern { aimedCannon, radialBurst }
 
+/// How an enemy shot is drawn. The battle rules only use its damage.
+enum EnemyShotStyle { cannon, laser, missile }
+
 /// A projectile the boss wants to fire this tick, before it gets an id.
 class EnemyShot {
   const EnemyShot({
@@ -21,6 +24,7 @@ class EnemyShot {
     required this.velocityX,
     required this.velocityY,
     required this.damage,
+    this.style = EnemyShotStyle.cannon,
   });
 
   final double originX;
@@ -28,6 +32,7 @@ class EnemyShot {
   final double velocityX;
   final double velocityY;
   final int damage;
+  final EnemyShotStyle style;
 }
 
 typedef BossUpdate = ({List<BattleEvent> events, List<EnemyShot> shots});
@@ -95,7 +100,19 @@ class BossState {
 
   bool get isCannonOperational => _operationalCannons.isNotEmpty;
 
-  BossAttackPattern get attackPattern => isCannonOperational
+  List<BossComponentDefinition> get _operationalWeapons => [
+    for (final c in definition.components)
+      if (_isDirected(c.kind) && !_components[c.id]!.isDestroyed) c,
+  ];
+
+  bool get hasAimedWeapon => _operationalWeapons.isNotEmpty;
+
+  static bool _isDirected(BossComponentKind kind) =>
+      kind == BossComponentKind.cannon ||
+      kind == BossComponentKind.laser ||
+      kind == BossComponentKind.missile;
+
+  BossAttackPattern get attackPattern => hasAimedWeapon
       ? BossAttackPattern.aimedCannon
       : BossAttackPattern.radialBurst;
 
@@ -151,9 +168,7 @@ class BossState {
     _time += dt;
     _driftPhase +=
         dt *
-        (isCannonOperational
-            ? definition.driftSpeed
-            : definition.enragedDriftSpeed);
+        (hasAimedWeapon ? definition.driftSpeed : definition.enragedDriftSpeed);
     _x =
         arena.width / 2 +
         math.sin(_driftPhase) * arena.width * definition.driftRange;
@@ -190,30 +205,57 @@ class BossState {
       return (events: events, shots: _burst());
     }
     final shots = <EnemyShot>[];
-    for (final cannon in _operationalCannons) {
+    for (final weapon in _operationalWeapons) {
       final remaining =
-          (_cannonReadyIn[cannon.id] ?? definition.initialAttackDelay) - dt;
+          (_cannonReadyIn[weapon.id] ?? definition.initialAttackDelay) - dt;
       if (remaining > 0) {
-        _cannonReadyIn[cannon.id] = remaining;
+        _cannonReadyIn[weapon.id] = remaining;
         continue;
       }
-      shots.add(_aimedShot(cannon, targetX, targetY));
-      _cannonReadyIn[cannon.id] = math.max(
-        remaining + _cannonInterval(cannon),
+      shots.add(_aimedShot(weapon, targetX, targetY));
+      _cannonReadyIn[weapon.id] = math.max(
+        remaining + _weaponInterval(weapon),
         0,
       );
     }
     return (events: events, shots: shots);
   }
 
-  /// Level 2 and above shorten the boss's aimed-shot interval by a third.
-  double _cannonInterval(BossComponentDefinition cannon) =>
-      definition.aimedShot.interval * (cannon.weaponLevel >= 2 ? 2 / 3 : 1);
+  /// Cannons shorten their interval at level 2. The laser is faster still
+  /// and the missile is slower.
+  double _weaponInterval(BossComponentDefinition weapon) {
+    final base = definition.aimedShot.interval;
+    return switch (weapon.kind) {
+      BossComponentKind.laser => base * 0.4,
+      BossComponentKind.missile => base * 2,
+      _ => base * (weapon.weaponLevel >= 2 ? 2 / 3 : 1),
+    };
+  }
 
-  /// Level 3 and above add half again to the aimed-shot damage.
-  int _cannonDamage(BossComponentDefinition cannon) => cannon.weaponLevel >= 3
-      ? (definition.aimedShot.damage * 1.5).round()
-      : definition.aimedShot.damage;
+  int _weaponDamage(BossComponentDefinition weapon) {
+    final base = definition.aimedShot.damage;
+    return switch (weapon.kind) {
+      BossComponentKind.laser => (base * 0.5).round(),
+      BossComponentKind.missile => base * 2,
+      _ => weapon.weaponLevel >= 3 ? (base * 1.5).round() : base,
+    };
+  }
+
+  EnemyShotStyle _weaponStyle(BossComponentDefinition weapon) =>
+      switch (weapon.kind) {
+        BossComponentKind.laser => EnemyShotStyle.laser,
+        BossComponentKind.missile => EnemyShotStyle.missile,
+        _ => EnemyShotStyle.cannon,
+      };
+
+  double _weaponSpeed(BossComponentDefinition weapon) {
+    final base = definition.aimedShot.speed;
+    return switch (weapon.kind) {
+      BossComponentKind.laser => base * 1.7,
+      BossComponentKind.missile => base * 0.5,
+      _ => base,
+    };
+  }
 
   /// Applies a hit from a [weaponType] weapon with [baseDamage] to
   /// [componentId].
@@ -282,8 +324,10 @@ class BossState {
           _phase = BossPhase.defeated;
           events.add(const BossDefeated());
           return events;
-        case BossComponentKind.cannon:
-          events.addAll(_onCannonDestroyed());
+        case BossComponentKind.cannon ||
+            BossComponentKind.laser ||
+            BossComponentKind.missile:
+          events.addAll(_onWeaponDestroyed(component.kind));
         case BossComponentKind.armor || BossComponentKind.hull:
           break;
       }
@@ -302,12 +346,14 @@ class BossState {
     return events;
   }
 
-  List<BattleEvent> _onCannonDestroyed() {
-    final lastCannon = !isCannonOperational;
+  List<BattleEvent> _onWeaponDestroyed(BossComponentKind kind) {
+    final lastCannon = kind == BossComponentKind.cannon && !isCannonOperational;
     final shieldBreak = definition.shieldBreakDuration;
     final events = <BattleEvent>[];
-    if (lastCannon) events.add(BossBehaviorChanged(pattern: attackPattern));
-    if (shieldBreak == null) return events;
+    if (!hasAimedWeapon) {
+      events.add(BossBehaviorChanged(pattern: attackPattern));
+    }
+    if (shieldBreak == null || kind != BossComponentKind.cannon) return events;
     if (lastCannon) {
       _shieldBreakTimeLeft = 0;
       events.add(const CoreShieldDropped(duration: null));
@@ -328,16 +374,16 @@ class BossState {
     final dx = targetX - originX;
     final dy = targetY - originY;
     final distance = math.sqrt(dx * dx + dy * dy);
-    final pattern = definition.aimedShot;
     final (dirX, dirY) = distance == 0
         ? (0.0, 1.0)
         : (dx / distance, dy / distance);
     return EnemyShot(
       originX: originX,
       originY: originY,
-      velocityX: dirX * pattern.speed,
-      velocityY: dirY * pattern.speed,
-      damage: _cannonDamage(cannon),
+      velocityX: dirX * _weaponSpeed(cannon),
+      velocityY: dirY * _weaponSpeed(cannon),
+      damage: _weaponDamage(cannon),
+      style: _weaponStyle(cannon),
     );
   }
 

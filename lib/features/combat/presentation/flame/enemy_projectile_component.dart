@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 
+import '../../domain/entities/boss_state.dart';
 import 'player_ship_component.dart';
 import 'space_game.dart';
 
@@ -14,13 +15,25 @@ class EnemyProjectileComponent extends PositionComponent
     required this.projectileId,
     required Vector2 origin,
     required this.velocity,
-  }) : super(position: origin, size: Vector2.all(10), anchor: Anchor.center);
+    this.style = EnemyShotStyle.cannon,
+  }) : super(
+         position: origin,
+         size: switch (style) {
+           EnemyShotStyle.cannon => Vector2.all(10),
+           EnemyShotStyle.laser => Vector2(4, 18),
+           EnemyShotStyle.missile => Vector2.all(14),
+         },
+         anchor: Anchor.center,
+       );
 
   final int projectileId;
   final Vector2 velocity;
+  final EnemyShotStyle style;
   bool _resolved = false;
 
-  static final _paint = Paint()..color = const Color(0xFFFF7043);
+  static final _cannonPaint = Paint()..color = const Color(0xFFFF7043);
+  static final _laserPaint = Paint()..color = const Color(0xFF4DF0FF);
+  static final _missilePaint = Paint()..color = const Color(0xFFFFC857);
 
   @override
   Future<void> onLoad() async {
@@ -47,7 +60,26 @@ class EnemyProjectileComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
-    canvas.drawCircle(Offset(size.x / 2, size.y / 2), size.x / 2, _paint);
+    final center = Offset(size.x / 2, size.y / 2);
+    switch (style) {
+      case EnemyShotStyle.cannon:
+        canvas.drawCircle(center, size.x / 2, _cannonPaint);
+      case EnemyShotStyle.laser:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(size.toRect(), const Radius.circular(2)),
+          _laserPaint,
+        );
+      case EnemyShotStyle.missile:
+        canvas.drawPath(
+          Path()
+            ..moveTo(center.dx, 0)
+            ..lineTo(size.x, center.dy)
+            ..lineTo(center.dx, size.y)
+            ..lineTo(0, center.dy)
+            ..close(),
+          _missilePaint,
+        );
+    }
   }
 
   @override

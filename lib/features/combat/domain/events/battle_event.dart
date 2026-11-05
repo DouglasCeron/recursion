@@ -40,6 +40,7 @@ class EnemyFired extends BattleEvent {
     required this.originY,
     required this.velocityX,
     required this.velocityY,
+    this.style = EnemyShotStyle.cannon,
   });
 
   final int projectileId;
@@ -47,6 +48,7 @@ class EnemyFired extends BattleEvent {
   final double originY;
   final double velocityX;
   final double velocityY;
+  final EnemyShotStyle style;
 }
 
 class BossComponentHit extends BattleEvent {

@@ -298,3 +298,70 @@ class WeaponReinforcement extends BossMutation {
     return boss.copyWith(components: parts);
   }
 }
+
+/// Adds one [weapon] on [zone]. A boss gets a single laser, then a single
+/// missile. Each is its own shot: the laser is fast and light, the missile
+/// is slow and heavy.
+class AddedWeapon extends BossMutation {
+  const AddedWeapon(super.zone, this.weapon);
+
+  final BossWeapon weapon;
+
+  static const laserIntegrity = 70;
+  static const missileIntegrity = 80;
+
+  BossComponentKind get _kind => switch (weapon) {
+    BossWeapon.laser => BossComponentKind.laser,
+    BossWeapon.missile => BossComponentKind.missile,
+  };
+
+  String get partId => 'evolved.${weapon.name}_${zone.name}';
+
+  @override
+  bool canApply(BossDefinition boss) =>
+      boss.components.every((c) => c.kind != _kind);
+
+  @override
+  BossDefinition applyTo(BossDefinition boss) {
+    if (!canApply(boss)) return boss;
+    final spot = _spot(boss);
+    final (width, height, integrity, name) = switch (weapon) {
+      BossWeapon.laser => (10.0, 28.0, laserIntegrity, 'Laser'),
+      BossWeapon.missile => (18.0, 18.0, missileIntegrity, 'Missile'),
+    };
+    return boss.copyWith(
+      components: [
+        ...boss.components,
+        BossComponentDefinition(
+          id: partId,
+          name: name,
+          kind: _kind,
+          maxIntegrity: integrity,
+          offsetX: spot.x,
+          offsetY: spot.y,
+          width: width,
+          height: height,
+          evolved: true,
+        ),
+      ],
+    );
+  }
+
+  /// Beside the zone, clear of a cannon already sitting there. The center
+  /// hangs the weapon below the cannon.
+  ({double x, double y}) _spot(BossDefinition boss) {
+    BossComponentDefinition? cannon;
+    for (final part in boss.components) {
+      if (part.kind == BossComponentKind.cannon && part.zone == zone) {
+        cannon = part;
+      }
+    }
+    if (zone == BossZone.center && cannon != null) {
+      return (x: cannon.offsetX, y: cannon.bottom + 8 + 14);
+    }
+    final outward = zone == BossZone.left ? -1.0 : 1.0;
+    var x = cannon?.offsetX ?? (zone == BossZone.left ? -76.0 : 76.0);
+    if (cannon != null) x += outward * (cannon.width + 10);
+    return (x: x, y: cannon?.offsetY ?? 48);
+  }
+}

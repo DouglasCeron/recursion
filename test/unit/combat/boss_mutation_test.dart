@@ -180,6 +180,73 @@ void main() {
           );
         },
       );
+
+      test('a cannon at full power is followed by a laser, then a missile', () {
+        final heavy = const WeaponUpgrade(BossZone.center, faster: false)
+            .applyTo(
+              const WeaponUpgrade(
+                BossZone.center,
+                faster: true,
+              ).applyTo(sentinel),
+            );
+        final withLaser = const AddedWeapon(
+          BossZone.center,
+          BossWeapon.laser,
+        ).applyTo(heavy);
+        final withMissile = const AddedWeapon(
+          BossZone.center,
+          BossWeapon.missile,
+        ).applyTo(withLaser);
+
+        expect(
+          withLaser.component('evolved.laser_center').kind,
+          BossComponentKind.laser,
+        );
+        expect(
+          withLaser.component('evolved.laser_center').top,
+          greaterThan(sentinel.component('sentinel.cannon').bottom),
+        );
+        expect(
+          withMissile.component('evolved.missile_center').kind,
+          BossComponentKind.missile,
+        );
+        expect(
+          const AddedWeapon(
+            BossZone.left,
+            BossWeapon.laser,
+          ).canApply(withLaser),
+          isFalse,
+        );
+      });
+
+      test('the laser is fast and light, the missile slow and heavy', () {
+        final armed = const AddedWeapon(BossZone.center, BossWeapon.missile)
+            .applyTo(
+              const AddedWeapon(
+                BossZone.center,
+                BossWeapon.laser,
+              ).applyTo(sentinel),
+            );
+        final boss = BossState(definition: armed, arena: ArenaBounds.standard);
+        final shots = boss.update(1.5, targetX: 180, targetY: 500).shots;
+        final laser = shots.singleWhere((s) => s.style == EnemyShotStyle.laser);
+        final missile = shots.singleWhere(
+          (s) => s.style == EnemyShotStyle.missile,
+        );
+        final cannon = shots.singleWhere(
+          (s) => s.style == EnemyShotStyle.cannon,
+        );
+
+        expect(laser.damage, lessThan(cannon.damage));
+        expect(missile.damage, greaterThan(cannon.damage));
+        expect(
+          boss
+              .update(0.5, targetX: 180, targetY: 500)
+              .shots
+              .map((s) => s.style),
+          [EnemyShotStyle.laser],
+        );
+      });
     });
   });
 }
